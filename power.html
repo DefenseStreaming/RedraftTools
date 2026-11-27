@@ -170,7 +170,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27i";
+  var MINE = "2026-11-27j";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -184,7 +184,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
 </script>
 </head>
 <body>
-<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html" aria-current="page">Power Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html" aria-current="page">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
 <div class="wrap">
   <header>
     <h1>Power Rankings</h1>
@@ -235,7 +235,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
   <div class="body"><div class="range" id="tierDlgRange"></div><p class="desc" id="tierDlgDesc"></p><p class="who" id="tierDlgWho"></p></div>
 </dialog>
-<script src="sleeper-core.js?v=2026-11-27i"></script>
+<script src="sleeper-core.js?v=2026-11-27j"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

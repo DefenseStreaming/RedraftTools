@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly Rankings | Sleeper Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f4;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#5b6f7c;--line:#d6dee3;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;--display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:40px;line-height:1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:64ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row .grow{flex:2 1 260px}.row .sm{flex:1 1 130px}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-size:22px;letter-spacing:.03em;font-weight:600;padding:6px 32px}
+button:disabled{opacity:.6;cursor:progress}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.banner{border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:8px}
+.banner.error{background:var(--bad-bg);color:var(--bad-ink)}
+.banner.note{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.banner.sample{background:var(--warn-bg);color:var(--warn-ink)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;font-weight:600;white-space:nowrap}
+th:nth-child(1),th:nth-child(2),td:nth-child(1),td:nth-child(2){text-align:left}
+td{padding:9px 10px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+td.tm{font-weight:600}
+td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
+tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+.controls{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.controls{grid-template-columns:1fr 1fr}.controls .wide{grid-column:1/-1}}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 12px}
+.tabs button{min-height:40px;padding:4px 16px;font-weight:700;font-family:var(--display);font-size:20px;letter-spacing:.03em}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pos{display:inline-block;min-width:30px;text-align:center;font-size:11px;font-weight:700;border-radius:4px;padding:2px 4px;margin-right:6px;color:#fff;vertical-align:1px}
+.pos.QB{background:#c2410c}.pos.RB{background:#0f766e}.pos.WR{background:#1d4ed8}.pos.TE{background:#7c3aed}
+.inj{font-size:11px;font-weight:700;color:var(--bad-ink);background:var(--bad-bg);border-radius:4px;padding:1px 5px;margin-left:4px}
+.inj.q{color:var(--warn-ink);background:var(--warn-bg)}
+.rk td.pn{white-space:normal;text-align:left;font-weight:600;min-width:150px}
+.rk td.pn small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.rk td.own{text-align:left;white-space:normal;min-width:110px;font-size:14px}
+.rk th.own{text-align:left}
+.rk td.own.fa{color:var(--muted);font-style:italic}
+.rk td.sc{font-family:var(--display);font-size:22px;font-weight:700;color:var(--accent)}
+.rk td.res small{display:block;color:var(--muted);font-size:12px}
+.rk tr.mine td{background:color-mix(in srgb,var(--accent-soft) 55%,transparent)}
+.rk tr.off td{color:var(--muted)}
+.rk tr.off td.sc{color:var(--muted);font-size:14px;font-family:var(--body)}
+.rk td.n0{color:var(--muted)}
+.own-sm{display:none}
+@media(max-width:700px){.rk th.own,.rk td.own{display:none}.own-sm{display:block;color:var(--ink);opacity:.8}.rk td,.rk th{padding:8px 4px}.rk th{font-size:11px;letter-spacing:.03em}
+  .rk td.pn{min-width:0;font-size:15px}.rk td.sc{font-size:19px}.rk .pos{display:none}.rk td:first-child{padding-left:0}
+  .tabs button{padding:4px 12px;font-size:18px;flex:1 1 0}.panel.rkp{padding:12px 10px}}
+.more{display:flex;justify-content:center;margin-top:12px}
+</style>
+<script>
+/* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
+   copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
+(function () {
+  var MINE = "2026-11-27j";
+  try {
+    fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+      if (!v || !v.version || v.version === MINE) return;
+      var u = new URL(location.href);
+      if (u.searchParams.get("v") === v.version) return;          // already tried: don't loop
+      u.searchParams.set("v", v.version);
+      location.replace(u.toString());
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html" aria-current="page">Weekly Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>Weekly Rankings</h1>
+    <p class="sub">Start/sit rankings for any week, scored with your league's settings: 75% Sleeper's projection for that week and 25% what he's done this season (or lately). Every player shows who owns him.</p>
+  </header>
+  <section class="panel" aria-label="League">
+    <div class="row">
+      <div class="grow"><label class="f" for="leagueId">Sleeper league ID</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="run" class="primary" type="button">Load league</button>
+      <button id="demo" type="button">Use sample data</button>
+    </div>
+  </section>
+  <section id="status" aria-live="polite"></section>
+  <div id="app" hidden>
+    <section class="panel" aria-label="Options">
+      <div class="controls">
+        <div><label class="f" for="week">Week</label><select id="week"></select></div>
+        <div><label class="f" for="form">The 25% part</label><select id="form"><option value="season">Season average</option><option value="recent">Last 3 games</option></select></div>
+        <div class="wide"><label class="f" for="show">Show</label><select id="show"></select></div>
+      </div>
+      <p class="hint" id="weekNote"></p>
+    </section>
+    <section class="panel rkp" aria-label="Rankings">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="scroll"><table class="rk"><thead id="head"></thead><tbody id="list"></tbody></table></div>
+      <div class="more"><button id="more" type="button" hidden>Show more</button></div>
+    </section>
+  </div>
+  <section class="panel explain">
+    <div><b>Score.</b> 75% of Sleeper's projected points for the week you pick, plus 25% of his form: his average points per game this season, or his average over his last 3 games if you choose that. Both use your league's own scoring. Games he didn't play (byes, injuries) don't count against his average. A player with no games yet (a rookie, or someone back from a long injury) uses his projection for the whole score.</div>
+    <div><b>Changing weeks.</b> Pick any week of the season. For a past week, form only counts games before that week, so the rankings are what they would have said at the time, and the Result column shows what each player actually scored and where he finished at his position. Future weeks use every game played so far.</div>
+    <div><b>Owners</b> are today's rosters. Players Sleeper projects for 0 points (bye or out) are left off the list, except when you show one team, where they're listed at the bottom so you can see who's missing. FLEX ranks running backs, receivers and tight ends together.</div>
+  </section>
+</div>
+<script src="sleeper-core.js?v=2026-11-27j"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
+
+const TABS = ["QB", "RB", "WR", "TE", "FLEX"];
+const PAGE = 50;
+let B = null, NET = null, POINTS = {}, DONE = 0, PROJ = {}, R = null, notes = [];
+const S = { tab: store.get("wkTab") || "QB", form: store.get("wkForm") || "season", show: "all", week: 1, limit: PAGE };
+if (!TABS.includes(S.tab)) S.tab = "QB";
+if (!["season", "recent"].includes(S.form)) S.form = "season";
+
+function injBadge(st) {
+  if (!st) return "";
+  const q = /quest/i.test(st);
+  const short = { Questionable: "Q", Doubtful: "D", Out: "OUT", IR: "IR", PUP: "PUP", Sus: "SUS" }[st] || st.toUpperCase().slice(0, 4);
+  return `<span class="inj${q ? " q" : ""}" title="${esc(st)}">${esc(short)}</span>`;
+}
+const f1 = (x) => (x === null || x === undefined ? "--" : x.toFixed(1));
+
+function drawTabs() {
+  $("tabs").innerHTML = TABS.map((t) => `<button type="button" role="tab" data-tab="${t}" aria-selected="${t === S.tab}">${t}</button>`).join("");
+}
+function drawList() {
+  if (!R) return;
+  const flex = S.tab === "FLEX";
+  const inTab = (r) => (flex ? r.pos !== "QB" : r.pos === S.tab);
+  const showTeam = /^\d+$/.test(S.show) ? +S.show : null;
+  const keep = (r) => S.show === "all" || (S.show === "fa" ? !r.ownerRid : S.show === "owned" ? !!r.ownerRid : r.ownerRid === showTeam);
+  const on = R.rows.filter((r) => r.playing && inTab(r) && keep(r));
+  const off = showTeam !== null ? R.rows.filter((r) => !r.playing && inTab(r) && keep(r)) : [];
+  const res = R.result;
+  const formHead = R.form === "recent" ? `Last ${R.recentN}` : "Avg";
+  $("head").innerHTML = `<tr><th>#</th><th>Player</th><th class="own">Owner</th><th title="Sleeper projection for the week, your scoring">Proj</th>
+    <th title="${R.form === "recent" ? `Average of his last ${R.recentN} games` : "Points per game this season"}">${formHead}</th><th title="75% projection + 25% ${formHead.toLowerCase()}">Score</th>${res ? `<th>${res === "final" ? "Result" : "So far"}</th>` : ""}</tr>`;
+  const shown = on.slice(0, S.limit);
+  const row = (r, i) => {
+    const rank = r.playing ? (flex ? r.flexRank : r.posRank) : "";
+    const tags = [r.nfl ? (r.opp ? `${r.nfl} vs ${r.opp}` : r.nfl) : "", flex && r.playing ? `${r.pos}${r.posRank}` : "",
+      r.games ? `${r.games} game${r.games === 1 ? "" : "s"}` : "no games yet"].filter(Boolean).join(" · ");
+    const own = r.ownerName ? esc(r.ownerName) : "Free agent";
+    const resCell = !res ? "" : r.actual === null ? `<td class="res n0">--</td>`
+      : `<td class="res">${r.actual.toFixed(1)}${res === "final" && r.actualRank ? `<small>${r.pos}${r.actualRank}</small>` : ""}</td>`;
+    const mine = showTeam === null && S.show !== "fa" && r.ownerRid && r.ownerRid === +store.get("wkMine");
+    return `<tr class="${r.playing ? "" : "off"}${mine ? " mine" : ""}"><td>${rank}</td>
+      <td class="pn"><span class="pos ${r.pos}">${r.pos}</span>${esc(r.name)}${R.result === "final" ? "" : injBadge(r.injury)}<small>${esc(tags)}<span class="own-sm">${own}</span></small></td>
+      <td class="own${r.ownerName ? "" : " fa"}">${own}</td>
+      ${r.playing ? `<td>${f1(r.proj)}</td><td class="${r.form === null ? "n0" : ""}">${f1(r.form)}</td><td class="sc">${f1(r.score)}</td>`
+        : `<td>0.0</td><td>${f1(r.form)}</td><td class="sc">${r.status === "bye" ? "Bye" : "Out"}</td>`}${resCell}</tr>`;
+  };
+  $("list").innerHTML = shown.map(row).join("") + off.map(row).join("") ||
+    `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No players here for this week.</td></tr>`;
+  const left = on.length - shown.length;
+  $("more").hidden = left <= 0;
+  $("more").textContent = `Show ${Math.min(PAGE, left)} more`;
+}
+async function compute() {
+  const w = S.week;
+  if (!(w in PROJ)) {
+    status("note", `Getting Sleeper projections for week ${w}…`);
+    PROJ[w] = B.proj[w] || (await SleeperCore.loadWeekRows(NET, B.season, w));
+  }
+  if (!PROJ[w]) {
+    R = null; $("list").innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Sleeper projections for week ${w} could not be loaded. Try again or pick another week.</td></tr>`;
+    $("head").innerHTML = ""; $("more").hidden = true; status("error", `No projections for week ${w}.`); return;
+  }
+  status(notes.length ? "note" : "", notes.join(" "));
+  R = SleeperCore.weeklyRankings(B, { week: w, projRows: PROJ[w], points: POINTS, done: DONE, form: S.form });
+  $("weekNote").textContent = R.result === "final"
+    ? `Week ${w} is finished. Form uses games through week ${R.histTo}, so this is how the rankings looked going in.`
+    : R.histTo > 0 ? `Form uses games through week ${R.histTo}.` : "No games played yet, so scores are the projection only.";
+  drawList();
+}
+function start(sample) {
+  $("app").hidden = false;
+  const last = B.lastWeek;
+  S.week = Math.min(Math.max(1, B.cw), last);
+  $("week").innerHTML = Array.from({ length: last }, (_, i) => i + 1).map((w) =>
+    `<option value="${w}"${w === S.week ? " selected" : ""}>Week ${w}${w === B.cw ? " (now)" : w > B.regEnd ? " (playoffs)" : ""}</option>`).join("");
+  $("form").value = S.form;
+  $("show").innerHTML = `<option value="all">All players</option><option value="fa">Free agents only</option><option value="owned">Rostered only</option>` +
+    `<optgroup label="One team">${B.teams.map((t) => `<option value="${t.rid}">${esc(t.name)}</option>`).join("")}</optgroup>`;
+  S.show = "all"; S.limit = PAGE;
+  drawTabs();
+  notes = B.notes.filter((n) => !/rest of the season|Projections were missing/i.test(n));
+  if (sample) notes.unshift("Sample data. These are made-up teams and players so you can try it. Enter your league ID and press Load league for your real league.");
+  return compute();
+}
+async function go(sample) {
+  const id = $("leagueId").value.trim();
+  if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Load league."); return; }
+  if (!sample) store.set("oddsLeague", id);
+  $("run").disabled = $("demo").disabled = true;
+  try {
+    NET = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
+    B = await SleeperCore.loadLeague(NET, sample ? "sample" : id, (t) => status("note", t));
+    PROJ = {}; POINTS = {};
+    DONE = Math.min(B.cw - 1, B.lastWeek);
+    status("note", "Reading every week's player stats…");
+    const weeks = Array.from({ length: Math.min(B.cw, B.lastWeek) }, (_, i) => i + 1);
+    const rows = await Promise.all(weeks.map((w) => SleeperCore.loadWeekRows(NET, B.season, w, "stats")));
+    let missing = 0;
+    weeks.forEach((w, i) => { if (!rows[i] && w <= DONE) missing++; POINTS[w] = SleeperCore.weekPoints(B, rows[i], w); });
+    if (!rows[weeks.length - 1] && B.cw <= B.lastWeek) delete POINTS[B.cw];       // no live stats yet
+    await start(sample);
+    if (missing) { notes.push(missing === DONE ? "Sleeper's weekly stats couldn't be loaded, so averages come from your league's matchups and only count weeks a player was on a roster." : `Stats were missing for ${missing} week${missing === 1 ? "" : "s"}; those use your league's matchups.`); status("note", notes.join(" ")); }
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);
+  } finally { $("run").disabled = $("demo").disabled = false; }
+}
+$("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tab]"); if (!b) return;
+  S.tab = b.dataset.tab; S.limit = PAGE; store.set("wkTab", S.tab); drawTabs(); drawList();
+});
+$("week").addEventListener("change", () => { S.week = +$("week").value; S.limit = PAGE; compute(); });
+$("form").addEventListener("change", () => { S.form = $("form").value; store.set("wkForm", S.form); compute(); });
+$("show").addEventListener("change", () => {
+  S.show = $("show").value; S.limit = PAGE;
+  if (/^\d+$/.test(S.show)) store.set("wkMine", S.show);
+  drawList();
+});
+$("more").addEventListener("click", () => { S.limit += PAGE; drawList(); });
+$("run").addEventListener("click", () => go(false));
+$("demo").addEventListener("click", () => go(true));
+$("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
+</script>
+</body>
+</html>

@@ -128,7 +128,7 @@ td.out{white-space:normal;min-width:220px}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27i";
+  var MINE = "2026-11-27j";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -142,7 +142,7 @@ td.out{white-space:normal;min-width:220px}
 </script>
 </head>
 <body>
-<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html" aria-current="page">Playoff Odds</a></div></nav>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html" aria-current="page">Playoff Odds</a></div></nav>
 <div class="wrap">
   <header>
     <h1>Playoff Odds</h1>

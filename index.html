@@ -22,7 +22,7 @@ footer{color:var(--muted);font-size:13px}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27i";
+  var MINE = "2026-11-27j";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -39,7 +39,8 @@ footer{color:var(--muted);font-size:13px}
 <section class="cards" aria-label="Tools">
 <a class="card" href="defense.html"><span class="tag">Live</span><h2>Defense Streamer</h2><p>Ranks every defense for the next three weeks using your league's defense scoring.</p></a>
 <a class="card" href="power.html"><span class="tag">Live</span><h2>Power Rankings</h2><p>Record 50%, points for 30% and roster strength 20%, with tiers and weekly movement.</p></a>
-<a class="card" href="trade.html"><span class="tag">New</span><h2>Trade Calculator</h2><p>Pick two teams and build a trade. A live bar shows if it's even, lopsided or a fleecing.</p></a>
+<a class="card" href="weekly.html"><span class="tag">New</span><h2>Weekly Rankings</h2><p>QB, RB, WR, TE and FLEX rankings for any week: 75% projection, 25% form, with every player's owner.</p></a>
+<a class="card" href="trade.html"><span class="tag">Live</span><h2>Trade Calculator</h2><p>Pick two teams and build a trade. A live bar shows if it's even, lopsided or a fleecing.</p></a>
 <a class="card" href="odds.html"><span class="tag">Live</span><h2>Playoff Odds</h2><p>Full simulation with lineups, injuries and byes. Enter your league ID and press Run.</p></a>
 </section>
 <footer>Not affiliated with Sleeper or the NFL. Data comes from Sleeper's public feeds.</footer>
