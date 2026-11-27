@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Power Rankings | Sleeper Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f4;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#5b6f7c;--line:#d6dee3;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;--display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:40px;line-height:1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:64ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row .grow{flex:2 1 260px}.row .sm{flex:1 1 130px}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-size:22px;letter-spacing:.03em;font-weight:600;padding:6px 32px}
+button:disabled{opacity:.6;cursor:progress}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.banner{border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:8px}
+.banner.error{background:var(--bad-bg);color:var(--bad-ink)}
+.banner.note{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.banner.sample{background:var(--warn-bg);color:var(--warn-ink)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;font-weight:600;white-space:nowrap}
+th:nth-child(1),th:nth-child(2),td:nth-child(1),td:nth-child(2){text-align:left}
+td{padding:9px 10px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+td.tm{font-weight:600}
+td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
+tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+.meta{font-size:14px;color:var(--muted);margin:0 0 12px}.meta b{color:var(--ink)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.tile .top{display:flex;gap:12px;align-items:flex-start;padding:12px 14px 10px}
+.tile .rk{font-family:var(--display);font-size:44px;font-weight:700;line-height:.9;min-width:1.4em;color:var(--accent)}
+.tile .mv{font-size:12px;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:2px;color:var(--muted)}
+.mv.up{color:#1f8a4c}.mv.down{color:#c0392b}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .mv.up{color:#4fd18b}:root:not([data-theme="light"]) .mv.down{color:#ff8a7a}}
+.tile .nm{font-family:var(--display);font-size:26px;font-weight:700;line-height:1.05;overflow-wrap:break-word}
+.tile .sub2{font-size:14px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .sc{margin-left:auto;text-align:right}
+.tile .sc b{font-family:var(--display);font-size:30px;line-height:1;display:block;font-variant-numeric:tabular-nums}
+.tile .sc span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tier{margin-top:auto;padding:8px 14px;font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.02em;color:#fff;text-transform:uppercase}
+.t-thanos{background:#5b2a86}.t-juggernaut{background:#0d6b4d}.t-contender{background:#1f5fa8}.t-hopeful{background:#2a8a8a}.t-purgatory{background:#b8711d}.t-pit{background:#8e1b1b}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.legend span{font-size:12px;font-weight:600;color:#fff;padding:3px 10px;border-radius:99px}
+.scroll{margin-top:16px}
+#tbl td:nth-child(3),#tbl th:nth-child(3){text-align:left}
+td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:2px 8px;border-radius:99px}
+</style>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html" aria-current="page">Power Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>Power Rankings</h1>
+    <p class="sub">Who's actually good? Record counts 50%, points scored 30% and roster strength 20%. Enter your Sleeper league ID and press Run.</p>
+  </header>
+  <section class="panel" aria-label="Settings">
+    <div class="row">
+      <div class="grow"><label class="f" for="leagueId">Sleeper league ID</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="run" class="primary" type="button">Run</button>
+      <button id="demo" type="button">Use sample data</button>
+    </div>
+    <p class="hint">Takes a few seconds: it reads every week's scores and Sleeper's projections for the rest of the season.</p>
+  </section>
+  <section id="status" aria-live="polite"></section>
+  <section id="results" hidden aria-label="Rankings">
+    <p class="meta" id="meta"></p>
+    <div class="tiles" id="tiles"></div>
+    <div class="legend" id="legend"></div>
+    <div class="panel scroll"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
+  </section>
+  <section class="panel explain">
+    <div><b>How the score works.</b> Each team gets three numbers: win percentage, total points scored, and roster strength. Each one is turned into a z-score (how far above or below the league average, in standard deviations). The z-scores are weighted 50% record, 30% points and 20% roster, then scaled to a 0–100 score where 50 is average: score = (weighted z + 2.5) ÷ 5 × 100.</div>
+    <div><b>Roster strength</b> is the best legal starting lineup each team can field, averaged over the next four weeks, using your league's scoring. Each player's weekly number is 65% Sleeper projection and 35% his points per game so far. Byes, IR and Out players count as zero, Questionable players count 78% for the coming game and Doubtful 10%. Empty spots are filled at waiver-wire level.</div>
+    <div><b>Movement</b> compares with last week's rankings, rebuilt from last week's record and points with the same roster score.</div>
+    <div><b>Tiers:</b> Thanos 80+, Juggernaut 67–79.9, Playoff Contender 53–66.9, Playoff Hopeful 42–52.9, Purgatory 30–41.9, Pit of Doom and Despair below 30.</div>
+  </section>
+</div>
+<script src="sleeper-core.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+const TIER_CLASS = { "Thanos": "t-thanos", "Juggernaut": "t-juggernaut", "Playoff Contender": "t-contender", "Playoff Hopeful": "t-hopeful", "Purgatory": "t-purgatory", "Pit of Doom and Despair": "t-pit" };
+$("legend").innerHTML = SleeperCore.TIERS.map(([lo, n]) => `<span class="${TIER_CLASS[n]}">${esc(n)}${lo > -Infinity ? " " + lo + "+" : " &lt;30"}</span>`).join("");
+function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
+const rec = (r) => `${r.wins}-${r.losses}` + (r.ties ? `-${r.ties}` : "");
+function moveHtml(m) {
+  if (m === null) return "";
+  if (m > 0) return `<span class="mv up" title="Up ${m} from last week">▲ ${m}</span>`;
+  if (m < 0) return `<span class="mv down" title="Down ${-m} from last week">▼ ${-m}</span>`;
+  return `<span class="mv" title="No change from last week">–</span>`;
+}
+function render(b, rows, sample) {
+  $("meta").innerHTML = `<b>${esc(b.league.name || "Your league")}</b> · standings through week ${b.gp} · roster strength looks at weeks ${b.remaining.slice(0, 4).join(", ") || "none left (points per game used)"}`;
+  $("tiles").innerHTML = rows.map((r) => `<article class="tile">
+    <div class="top"><div><div class="rk">${r.rank}</div>${moveHtml(r.move)}</div>
+      <div style="min-width:0"><div class="nm">${esc(r.name)}</div><div class="sub2">${rec(r)} · ${r.pf.toFixed(1)} PF</div></div>
+      <div class="sc"><b>${r.score.toFixed(1)}</b><span>Score</span></div></div>
+    <div class="tier ${TIER_CLASS[r.tier]}">${esc(r.tier)}</div></article>`).join("");
+  const z = (v) => (v >= 0 ? "+" : "") + v.toFixed(2);
+  $("body").innerHTML = rows.map((r) => `<tr><td>${r.rank}</td><td class="tm">${esc(r.name)}</td><td><span class="pill ${TIER_CLASS[r.tier]}">${esc(r.tier)}</span></td>
+    <td>${rec(r)}</td><td>${r.pf.toFixed(1)}</td><td>${r.roster.toFixed(1)}</td><td>${z(r.zWin)}</td><td>${z(r.zPf)}</td><td>${z(r.zRoster)}</td><td class="last">${r.score.toFixed(1)}</td></tr>`).join("");
+  $("results").hidden = false;
+  const notes = b.notes.slice();
+  if (sample) notes.unshift("Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real rankings.");
+  if (!b.gp) notes.push("No games have been played yet, so every team's record and points are even.");
+  status(sample ? "sample" : "note", notes.join(" "));
+  if (!notes.length) status("", "");
+}
+async function go(sample) {
+  const id = $("leagueId").value.trim();
+  if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }
+  if (!sample) store.set("oddsLeague", id);
+  $("run").disabled = $("demo").disabled = true;
+  try {
+    const net = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
+    const b = await SleeperCore.loadLeague(net, sample ? "sample" : id, (t) => status("note", t));
+    const vals = SleeperCore.computeValues(b);
+    render(b, SleeperCore.powerRankings(b, vals), sample);
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);
+  } finally { $("run").disabled = $("demo").disabled = false; }
+}
+$("run").addEventListener("click", () => go(false));
+$("demo").addEventListener("click", () => go(true));
+$("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
+</script>
+</body>
+</html>
