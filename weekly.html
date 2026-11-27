@@ -69,12 +69,17 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
   .rk td.pn{min-width:0;font-size:15px}.rk td.sc{font-size:19px}.rk .pos{display:none}.rk td:first-child{padding-left:0}
   .tabs button{padding:4px 12px;font-size:18px;flex:1 1 0}.panel.rkp{padding:12px 10px}}
 .more{display:flex;justify-content:center;margin-top:12px}
+.mix{display:grid;grid-template-columns:1fr 1fr auto;gap:12px 20px;align-items:end;margin-top:14px}
+@media(max-width:700px){.mix{grid-template-columns:1fr}.mix button{justify-self:start}}
+.sl{display:grid;grid-template-columns:1fr 52px;align-items:center;column-gap:10px}.sl label{grid-column:1/-1}
+.sl input[type=range]{width:100%;min-height:36px;accent-color:var(--accent)}
+.sl output{font-family:var(--display);font-size:24px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
 </style>
 <script>
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27j";
+  var MINE = "2026-11-27k";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -92,7 +97,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 <div class="wrap">
   <header>
     <h1>Weekly Rankings</h1>
-    <p class="sub">Start/sit rankings for any week, scored with your league's settings: 75% Sleeper's projection for that week and 25% what he's done this season (or lately). Every player shows who owns him.</p>
+    <p class="sub">QB, RB , WR, TE and Flex rankings based on your league settings and season averages</p>
   </header>
   <section class="panel" aria-label="League">
     <div class="row">
@@ -108,9 +113,15 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     <section class="panel" aria-label="Options">
       <div class="controls">
         <div><label class="f" for="week">Week</label><select id="week"></select></div>
-        <div><label class="f" for="form">The 25% part</label><select id="form"><option value="season">Season average</option><option value="recent">Last 3 games</option></select></div>
+        <div><label class="f" for="form">Average</label><select id="form"><option value="season">Season average</option><option value="recent">Last 3 games</option></select></div>
         <div class="wide"><label class="f" for="show">Show</label><select id="show"></select></div>
       </div>
+      <div class="mix" role="group" aria-label="Score weights">
+        <div class="sl"><label class="f" for="wProj">Projection</label><input id="wProj" type="range" min="0" max="100" step="5"><output id="oProj" for="wProj"></output></div>
+        <div class="sl"><label class="f" for="wAvg" id="avgLab">Average</label><input id="wAvg" type="range" min="0" max="100" step="5"><output id="oAvg" for="wAvg"></output></div>
+        <button id="resetW" type="button">Reset to 75 / 25</button>
+      </div>
+      <p class="hint">The two sliders always add up to 100%. Moving one moves the other.</p>
       <p class="hint" id="weekNote"></p>
     </section>
     <section class="panel rkp" aria-label="Rankings">
@@ -120,12 +131,12 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     </section>
   </div>
   <section class="panel explain">
-    <div><b>Score.</b> 75% of Sleeper's projected points for the week you pick, plus 25% of his form: his average points per game this season, or his average over his last 3 games if you choose that. Both use your league's own scoring. Games he didn't play (byes, injuries) don't count against his average. A player with no games yet (a rookie, or someone back from a long injury) uses his projection for the whole score.</div>
+    <div><b>Score.</b> A blend of Sleeper's projected points for the week you pick and his average: points per game this season, or over his last 3 games if you choose that. The default is 75% projection and 25% average; use the sliders to change the mix (they always add up to 100%) and Reset to go back. Both use your league's own scoring. Games he didn't play (byes, injuries) don't count against his average. A player with no games yet (a rookie, or someone back from a long injury) uses his projection for the whole score.</div>
     <div><b>Changing weeks.</b> Pick any week of the season. For a past week, form only counts games before that week, so the rankings are what they would have said at the time, and the Result column shows what each player actually scored and where he finished at his position. Future weeks use every game played so far.</div>
     <div><b>Owners</b> are today's rosters. Players Sleeper projects for 0 points (bye or out) are left off the list, except when you show one team, where they're listed at the bottom so you can see who's missing. FLEX ranks running backs, receivers and tight ends together.</div>
   </section>
 </div>
-<script src="sleeper-core.js?v=2026-11-27j"></script>
+<script src="sleeper-core.js?v=2026-11-27k"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -136,6 +147,9 @@ function status(kind, text) { $("status").innerHTML = text ? `<div class="banner
 const TABS = ["QB", "RB", "WR", "TE", "FLEX"];
 const PAGE = 50;
 let B = null, NET = null, POINTS = {}, DONE = 0, PROJ = {}, R = null, notes = [];
+const DEF_PROJ = 75;
+let projPct = parseInt(store.get("wkProjW"), 10);
+if (!(projPct >= 0 && projPct <= 100)) projPct = DEF_PROJ;
 const S = { tab: store.get("wkTab") || "QB", form: store.get("wkForm") || "season", show: "all", week: 1, limit: PAGE };
 if (!TABS.includes(S.tab)) S.tab = "QB";
 if (!["season", "recent"].includes(S.form)) S.form = "season";
@@ -162,7 +176,7 @@ function drawList() {
   const res = R.result;
   const formHead = R.form === "recent" ? `Last ${R.recentN}` : "Avg";
   $("head").innerHTML = `<tr><th>#</th><th>Player</th><th class="own">Owner</th><th title="Sleeper projection for the week, your scoring">Proj</th>
-    <th title="${R.form === "recent" ? `Average of his last ${R.recentN} games` : "Points per game this season"}">${formHead}</th><th title="75% projection + 25% ${formHead.toLowerCase()}">Score</th>${res ? `<th>${res === "final" ? "Result" : "So far"}</th>` : ""}</tr>`;
+    <th title="${R.form === "recent" ? `Average of his last ${R.recentN} games` : "Points per game this season"}">${formHead}</th><th title="${Math.round(R.projWeight * 100)}% projection + ${100 - Math.round(R.projWeight * 100)}% ${formHead.toLowerCase()}">Score</th>${res ? `<th>${res === "final" ? "Result" : "So far"}</th>` : ""}</tr>`;
   const shown = on.slice(0, S.limit);
   const row = (r, i) => {
     const rank = r.playing ? (flex ? r.flexRank : r.posRank) : "";
@@ -195,7 +209,7 @@ async function compute() {
     $("head").innerHTML = ""; $("more").hidden = true; status("error", `No projections for week ${w}.`); return;
   }
   status(notes.length ? "note" : "", notes.join(" "));
-  R = SleeperCore.weeklyRankings(B, { week: w, projRows: PROJ[w], points: POINTS, done: DONE, form: S.form });
+  R = SleeperCore.weeklyRankings(B, { week: w, projRows: PROJ[w], points: POINTS, done: DONE, form: S.form, projWeight: projPct / 100 });
   $("weekNote").textContent = R.result === "final"
     ? `Week ${w} is finished. Form uses games through week ${R.histTo}, so this is how the rankings looked going in.`
     : R.histTo > 0 ? `Form uses games through week ${R.histTo}.` : "No games played yet, so scores are the projection only.";
@@ -244,16 +258,32 @@ $("tabs").addEventListener("click", (e) => {
   S.tab = b.dataset.tab; S.limit = PAGE; store.set("wkTab", S.tab); drawTabs(); drawList();
 });
 $("week").addEventListener("change", () => { S.week = +$("week").value; S.limit = PAGE; compute(); });
-$("form").addEventListener("change", () => { S.form = $("form").value; store.set("wkForm", S.form); compute(); });
+$("form").addEventListener("change", () => { S.form = $("form").value; store.set("wkForm", S.form); drawWeights(); compute(); });
 $("show").addEventListener("change", () => {
   S.show = $("show").value; S.limit = PAGE;
   if (/^\d+$/.test(S.show)) store.set("wkMine", S.show);
   drawList();
 });
+function drawWeights() {
+  $("wProj").value = projPct; $("wAvg").value = 100 - projPct;
+  $("oProj").textContent = projPct + "%"; $("oAvg").textContent = 100 - projPct + "%";
+  $("avgLab").textContent = S.form === "recent" ? "Last 3 games" : "Season average";
+  $("resetW").disabled = projPct === DEF_PROJ;
+}
+function setWeights(p) {
+  projPct = Math.min(100, Math.max(0, Math.round(p / 5) * 5));
+  store.set("wkProjW", String(projPct)); drawWeights();
+  if (R) { R = SleeperCore.weeklyRankings(B, { week: S.week, projRows: PROJ[S.week], points: POINTS, done: DONE, form: S.form, projWeight: projPct / 100 }); drawList(); }
+}
+$("wProj").addEventListener("input", () => setWeights(+$("wProj").value));
+$("wAvg").addEventListener("input", () => setWeights(100 - +$("wAvg").value));
+$("resetW").addEventListener("click", () => setWeights(DEF_PROJ));
+drawWeights();
 $("more").addEventListener("click", () => { S.limit += PAGE; drawList(); });
 $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
 $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
 </script>
+<script src="leagues.js?v=2026-11-27k"></script>
 </body>
 </html>

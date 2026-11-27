@@ -489,7 +489,7 @@
   }
 
   /* ---------------- weekly rankings ----------------
-     score = 75% Sleeper's projection for that week + 25% form (season average, or average of his last
+     score = 75% (adjustable: o.projWeight) Sleeper's projection for that week + 25% form (season average, or average of his last
      few games), both scored with the league's settings. Form only uses games before the chosen week. */
   const WEEKLY_PROJ = 0.75, RECENT_GAMES = 3;
   const WEEKLY_POS = ["QB", "RB", "WR", "TE"];
@@ -529,11 +529,12 @@
     }
     return out;
   }
-  /* o: { week, projRows, points: {w: weekPoints}, done (last finished week), form: "season"|"recent", recent } */
+  /* o: { week, projRows, points: {w: weekPoints}, done (last finished week), form: "season"|"recent", recent, projWeight (0-1) } */
   function weeklyRankings(b, o) {
     const info = (pid) => b.db[pid] || b.rowInfo[pid] || {};
     const form = o.form === "recent" ? "recent" : "season";
     const recentN = o.recent || RECENT_GAMES;
+    const pw = Number.isFinite(o.projWeight) ? Math.min(1, Math.max(0, o.projWeight)) : WEEKLY_PROJ;
     const owner = {};
     for (const t of b.teams) for (const pid of t.players) owner[pid] = t;
     const proj = {}, opp = {}, rowPl = {}, teamPlays = new Set();
@@ -565,7 +566,7 @@
       const p = proj[pid] || 0;
       const nfl = String(inf.team || "").toUpperCase();
       const playing = p > 0;
-      const score = playing ? WEEKLY_PROJ * p + (1 - WEEKLY_PROJ) * (formAvg === null ? p : formAvg) : 0;
+      const score = playing ? pw * p + (1 - pw) * (formAvg === null ? p : formAvg) : 0;
       const t = owner[pid];
       const act = result && o.points[o.week] ? o.points[o.week][pid] : null;
       rows.push({ pid, pos, name: inf.full_name || [inf.first_name, inf.last_name].filter(Boolean).join(" ") || pid, nfl: inf.team || "",
@@ -586,7 +587,7 @@
       const fin = {};
       rows.filter((r) => r.actual !== null).slice().sort((a, c) => c.actual - a.actual).forEach((r) => { r.actualRank = fin[r.pos] = (fin[r.pos] || 0) + 1; });
     }
-    return { rows, result, form, recentN, histTo };
+    return { rows, result, form, recentN, histTo, projWeight: pw };
   }
 
   /* ---------------- trades ---------------- */
