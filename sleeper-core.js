@@ -245,6 +245,15 @@
       maxRaw = Math.max(maxRaw, p.vor);
     }
     for (const p of Object.values(players)) p.value = maxRaw > 0 ? 100 * Math.pow(p.vor / maxRaw, STAR_POWER) : 0;
+    // season value: the same scale for what a player was worth this season as a whole, ignoring who is
+    // hurt or on bye now. Used to rate the rosters teams had in earlier weeks (score-by-week chart).
+    let maxSeason = 0;
+    for (const p of Object.values(players)) {
+      const r = p.games ? 0.5 * p.ppg + 0.5 * (p.projPg || p.ppg) : p.rate;
+      p.seasonVor = Math.max(0, r - repl[p.pos]) * (STREAM_DISCOUNT[p.pos] || 1);
+      maxSeason = Math.max(maxSeason, p.seasonVor);
+    }
+    for (const p of Object.values(players)) p.seasonValue = maxSeason > 0 ? 100 * Math.pow(p.seasonVor / maxSeason, STAR_POWER) : 0;
     // positional ranks by value
     for (const pos of POSITIONS) {
       Object.values(players).filter((p) => p.pos === pos).sort((a, b) => b.value - a.value || b.rate - a.rate).forEach((p, i) => { p.posRank = i + 1; });
@@ -269,6 +278,17 @@
       }), b.slots, vals.repl).total;
     }
     return s / n;
+  }
+
+  /* roster strength = trade value of the best starting lineup + a little for bench depth
+     (same values as the trade calculator: rest of season, half done / half projected, above waivers) */
+  const BENCH_CREDIT = 0.15, BENCH_COUNT = 6;
+  function rosterValue(b, vals, pids, key = "value") {
+    const pool = pids.map((pid) => vals.players[pid]).filter(Boolean).map((p) => ({ pid: p.pid, pts: p[key] || 0, pos: p.pos }));
+    const lu = bestLineup(pool, b.slots, {});
+    const used = new Set(lu.used.map((x) => x.pid));
+    const bench = pool.filter((x) => !used.has(x.pid)).map((x) => x.pts).sort((a, c) => c - a).slice(0, BENCH_COUNT);
+    return lu.total + BENCH_CREDIT * bench.reduce((s2, v) => s2 + v, 0);
   }
 
   /* ---------------- power rankings ---------------- */
@@ -312,7 +332,7 @@
   }
   function powerRankings(b, vals) {
     const rosterScore = {};
-    for (const t of b.teams) rosterScore[t.rid] = lineupStrength(b, vals, t.players.filter((p) => !t.taxi.has(p)));
+    for (const t of b.teams) rosterScore[t.rid] = rosterValue(b, vals, t.players.filter((p) => !t.taxi.has(p)));
     const build = (rec) => b.teams.map((t) => {
       const r = rec[t.rid], g = r.w + r.l + r.t;
       return { rid: t.rid, winPct: g ? (r.w + 0.5 * r.t) / g : 0.5, pf: r.pf, roster: rosterScore[t.rid] };
@@ -339,11 +359,6 @@
   function powerHistory(b, vals, current) {
     const weeks = [], series = {}, ranks = {};
     for (const t of b.teams) { series[t.rid] = []; ranks[t.rid] = []; }
-    const histRate = (pid) => {
-      const p = vals.players[pid];
-      if (!p) return null;
-      return p.games ? 0.5 * p.ppg + 0.5 * (p.projPg || p.ppg) : p.rate;
-    };
     for (let w = 1; w <= b.gp; w++) {
       let sc;
       if (w === b.gp && current) sc = Object.fromEntries(current.map((r) => [r.rid, r.score]));
@@ -353,9 +368,7 @@
         for (const row of b.matchups[w] || []) rosterAt[row.roster_id] = (row.players || []).map(String);
         const rows = b.teams.map((t) => {
           const r = rec[t.rid], g = r.w + r.l + r.t;
-          const pool = (rosterAt[t.rid] || t.players).map((pid) => ({ pts: histRate(pid), pos: (vals.players[pid] || {}).pos }))
-            .filter((x) => x.pts !== null && x.pos);
-          return { rid: t.rid, winPct: g ? (r.w + 0.5 * r.t) / g : 0.5, pf: r.pf, roster: bestLineup(pool, b.slots, vals.repl).total };
+          return { rid: t.rid, winPct: g ? (r.w + 0.5 * r.t) / g : 0.5, pf: r.pf, roster: rosterValue(b, vals, rosterAt[t.rid] || t.players, "seasonValue") };
         });
         const ps = powerScores(rows);
         sc = Object.fromEntries(rows.map((r) => [r.rid, ps[r.rid].score]));
@@ -502,8 +515,8 @@
   }
 
   const api = { API, POSITIONS, SLOT_ACCEPTS, TIERS, liveNet, makeSampleNet, loadLeague, computeValues, bestLineup,
-    lineupStrength, powerRankings, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
-    settings: { DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
+    lineupStrength, rosterValue, powerRankings, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
+    settings: { BENCH_CREDIT, BENCH_COUNT, DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SleeperCore = api;
 })(typeof self !== "undefined" ? self : this);
