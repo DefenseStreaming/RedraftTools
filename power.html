@@ -63,6 +63,29 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .legend span{font-size:12px;font-weight:600;color:#fff;padding:3px 10px;border-radius:99px}
 .scroll{margin-top:16px}
 #tbl td:nth-child(3),#tbl th:nth-child(3){text-align:left}
+.viz{--series-1:#257de0;--series-2:#f47230;--series-3:#00b894;--context:#9aa8b2;--band-o:.13}
+@media(prefers-color-scheme:dark){:root:where(:not([data-theme="light"])) .viz{--series-1:#338ced;--series-2:#e76624;--series-3:#00a888;--context:#4c6170;--band-o:.2}}
+:root[data-theme="dark"] .viz{--series-1:#338ced;--series-2:#e76624;--series-3:#00a888;--context:#4c6170;--band-o:.2}
+.viz h2{font-family:var(--display);font-size:26px;margin:0}
+.viz .lede{color:var(--muted);font-size:14px;margin:2px 0 10px}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.picks button{min-height:34px;padding:4px 10px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.picks button .sw{width:10px;height:10px;border-radius:50%;background:var(--context)}
+.picks button[aria-pressed="true"]{border-color:var(--ink)}
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;height:auto;overflow:visible}
+.chartbox text{font-family:var(--body);fill:var(--muted);font-size:12px}
+.chartbox text.tierlbl{font-family:var(--display);font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;fill:var(--ink)}
+.chartbox text.dl{fill:var(--ink);font-weight:600;font-size:13px}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.18);min-width:190px;z-index:3;font-variant-numeric:tabular-nums}
+.tip b{font-size:13px}.tip div{display:flex;gap:6px;align-items:center;justify-content:space-between}.tip div span:first-child{display:flex;gap:6px;align-items:center}
+.tip i{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--context)}
+.tip .hl{font-weight:700}
+.tiers{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:14px}
+.tiers div{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--muted)}
+.tiers div b{color:var(--ink);display:block}
+.tiers .chip2{flex:none;width:14px;height:40px;border-radius:4px;margin-top:2px}
+details{margin-top:12px}summary{cursor:pointer;font-weight:600;font-size:14px;min-height:32px}
 td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:2px 8px;border-radius:99px}
 </style>
 </head>
@@ -88,13 +111,21 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
     <p class="meta" id="meta"></p>
     <div class="tiles" id="tiles"></div>
     <div class="legend" id="legend"></div>
+    <section class="panel viz" id="history" style="margin-top:16px" aria-label="Score history">
+      <h2>Score by week</h2>
+      <p class="lede" id="histLede">Each line is a team's power score after every week. Pick up to three teams to highlight. Hover a week to see everyone.</p>
+      <div class="picks" id="picks"></div>
+      <div class="chartbox" id="chartbox"></div>
+      <details><summary>Show as a table</summary><div class="scroll" style="margin-top:6px"><table id="histTable"></table></div></details>
+      <div class="tiers" id="tierDesc"></div>
+    </section>
     <div class="panel scroll"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
   </section>
   <section class="panel explain">
     <div><b>How the score works.</b> Each team gets three numbers: win percentage, total points scored, and roster strength. Each one is turned into a z-score (how far above or below the league average, in standard deviations). The z-scores are weighted 50% record, 30% points and 20% roster, then scaled to a 0–100 score where 50 is average: score = (weighted z + 2.5) ÷ 5 × 100.</div>
     <div><b>Roster strength</b> is the best legal starting lineup each team can field, averaged over the next four weeks, using your league's scoring. Each player's weekly number is 50% his points per game so far and 50% Sleeper's projected points per game. A player on bye that week, or projected out, counts as zero, Questionable players count 78% for the coming game and Doubtful 10%. Empty spots are filled at waiver-wire level.</div>
     <div><b>Movement</b> compares with last week's rankings, rebuilt from last week's record and points with the same roster score.</div>
-    <div><b>Tiers:</b> Thanos 80+, Juggernaut 67–79.9, Playoff Contender 53–66.9, Playoff Hopeful 42–52.9, Purgatory 30–41.9, Pit of Doom and Despair below 30.</div>
+    <div><b>Score by week</b> rebuilds every past week from that week's record and points for, plus the roster the team actually had that week (from Sleeper's weekly lineups). Those rosters are rated by what each player has done and is projected to do this season. The last point is this week's score.</div>
   </section>
 </div>
 <script src="sleeper-core.js"></script>
@@ -103,6 +134,15 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+const TIER_COLOR = { "Thanos": "#5b2a86", "Juggernaut": "#0d6b4d", "Playoff Contender": "#1f5fa8", "Playoff Hopeful": "#2a8a8a", "Purgatory": "#b8711d", "Pit of Doom and Despair": "#8e1b1b" };
+const TIER_TEXT = {
+  "Thanos": "Inevitable. The best team in the league by a distance and the title favorite.",
+  "Juggernaut": "A real contender. Wins most weeks, scores a ton and is built to go deep.",
+  "Playoff Contender": "Above average. Should make the playoffs and can win a round or two.",
+  "Playoff Hopeful": "Right around average. In the hunt, but needs some wins to break their way.",
+  "Purgatory": "Below average and stuck. Not dead yet, but the playoffs are slipping away.",
+  "Pit of Doom and Despair": "The bottom of the league. Time to play spoiler and start thinking about next year.",
+};
 const TIER_CLASS = { "Thanos": "t-thanos", "Juggernaut": "t-juggernaut", "Playoff Contender": "t-contender", "Playoff Hopeful": "t-hopeful", "Purgatory": "t-purgatory", "Pit of Doom and Despair": "t-pit" };
 $("legend").innerHTML = SleeperCore.TIERS.map(([lo, n]) => `<span class="${TIER_CLASS[n]}">${esc(n)}${lo > -Infinity ? " " + lo + "+" : " &lt;30"}</span>`).join("");
 function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
@@ -124,12 +164,112 @@ function render(b, rows, sample) {
   $("body").innerHTML = rows.map((r) => `<tr><td>${r.rank}</td><td class="tm">${esc(r.name)}</td><td><span class="pill ${TIER_CLASS[r.tier]}">${esc(r.tier)}</span></td>
     <td>${rec(r)}</td><td>${r.pf.toFixed(1)}</td><td>${r.roster.toFixed(1)}</td><td>${z(r.zWin)}</td><td>${z(r.zPf)}</td><td>${z(r.zRoster)}</td><td class="last">${r.score.toFixed(1)}</td></tr>`).join("");
   $("results").hidden = false;
+  drawHistory(b, rows);
   const notes = b.notes.slice();
   if (sample) notes.unshift("Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real rankings.");
   if (!b.gp) notes.push("No games have been played yet, so every team's record and points are even.");
   status(sample ? "sample" : "note", notes.join(" "));
   if (!notes.length) status("", "");
 }
+/* ---------- score-by-week chart ---------- */
+let H = null;
+const SVGNS = "http://www.w3.org/2000/svg";
+const tierRanges = () => { const t = SleeperCore.TIERS; return t.map(([lo, n], i) => ({ name: n, lo, hi: i ? t[i - 1][0] : Infinity })); };
+$("tierDesc").innerHTML = tierRanges().map((t) => `<div><span class="chip2" style="background:${TIER_COLOR[t.name]}"></span><span><b>${esc(t.name)} · ${t.lo === -Infinity ? "below 30" : t.hi === Infinity ? t.lo + "+" : `${t.lo}–${(t.hi - 0.1).toFixed(1)}`}</b>${esc(TIER_TEXT[t.name])}</span></div>`).join("");
+function drawHistory(b, rows) {
+  const box = $("history");
+  if (!H || !H.hist.weeks.length) { box.hidden = true; return; }
+  box.hidden = false;
+  drawPicks(); drawChart();
+  const wk = H.hist.weeks;
+  $("histTable").innerHTML = `<thead><tr><th>Team</th><th></th>${wk.map((w) => `<th>Wk ${w}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map((r) => `<tr><td class="tm">${esc(r.name)}</td><td></td>${H.hist.series[r.rid].map((v, i) => `<td title="Rank ${H.hist.ranks[r.rid][i]}">${v.toFixed(1)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+}
+const pickColor = (rid) => { const i = H.picks.indexOf(rid); return i < 0 ? null : `var(--series-${i + 1})`; };
+function drawPicks() {
+  const order = H.teams.slice().sort((a, c) => H.hist.series[c.rid].at(-1) - H.hist.series[a.rid].at(-1));
+  $("picks").innerHTML = order.map((t) => { const c = pickColor(t.rid);
+    return `<button type="button" data-rid="${t.rid}" aria-pressed="${!!c}"><span class="sw"${c ? ` style="background:${c}"` : ""}></span>${esc(t.name)}</button>`; }).join("");
+}
+$("picks").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-rid]"); if (!btn) return;
+  const rid = +btn.dataset.rid, i = H.picks.indexOf(rid);
+  if (i >= 0) H.picks.splice(i, 1); else { H.picks.push(rid); if (H.picks.length > 3) H.picks.shift(); }
+  drawPicks(); drawChart();
+});
+function el(tag, attrs, parent) { const n = document.createElementNS(SVGNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
+function drawChart() {
+  const box = $("chartbox"); box.innerHTML = "";
+  const { weeks, series, ranks } = H.hist;
+  const W = Math.max(300, box.clientWidth), narrow = W < 640;
+  const Ht = narrow ? 340 : 440, m = { l: narrow ? 30 : 190, r: narrow ? 8 : 170, t: 12, b: 30 };
+  const all = Object.values(series).flat();
+  const lo = Math.min(20, Math.floor((Math.min(...all) - 4) / 10) * 10), hi = Math.max(90, Math.ceil((Math.max(...all) + 4) / 10) * 10);
+  const x = (i) => m.l + (weeks.length === 1 ? (W - m.l - m.r) / 2 : (i / (weeks.length - 1)) * (W - m.l - m.r));
+  const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (Ht - m.t - m.b);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${Ht}`, width: W, height: Ht, role: "img", "aria-label": "Power score by week for every team, with tier bands" }, box);
+  // tier bands
+  for (const t of tierRanges()) {
+    const top = Math.min(hi, t.hi), bot = Math.max(lo, t.lo);
+    if (top <= bot) continue;
+    el("rect", { x: m.l, y: y(top), width: W - m.l - m.r, height: y(bot) - y(top), fill: TIER_COLOR[t.name], "fill-opacity": "var(--band-o)", style: `fill-opacity:var(--band-o)` }, svg);
+    if (!narrow) {                                   // tier name beside its band, in text ink
+      const mid = (y(top) + y(bot)) / 2;
+      el("rect", { x: m.l - 30, y: mid - 6, width: 4, height: 12, rx: 1, fill: TIER_COLOR[t.name] }, svg);
+      const lbl = el("text", { x: m.l - 36, y: mid + 4, class: "tierlbl", "text-anchor": "end" }, svg);
+      lbl.textContent = t.name;
+    }
+    if (bot > lo) { el("line", { x1: m.l, x2: W - m.r, y1: y(bot), y2: y(bot), stroke: "var(--line)", "stroke-width": 1 }, svg);
+      const tk = el("text", { x: m.l - 6, y: y(bot) + 4, "text-anchor": "end" }, svg); tk.textContent = bot; }
+  }
+  // x axis
+  const every = Math.ceil(weeks.length / Math.max(2, Math.floor((W - m.l - m.r) / 52)));
+  weeks.forEach((w, i) => { if (i % every && i !== weeks.length - 1) return; const t = el("text", { x: x(i), y: Ht - 8, "text-anchor": "middle" }, svg); t.textContent = narrow ? w : `Wk ${w}`; });
+  // lines: context first, highlighted on top
+  const path = (rid) => series[rid].map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const ctx = H.teams.filter((t) => !H.picks.includes(t.rid));
+  for (const t of ctx) {
+    const p = el("path", { d: path(t.rid), fill: "none", stroke: "var(--context)", "stroke-width": 1.5, "stroke-linejoin": "round", "data-rid": t.rid, class: "ctxline" }, svg);
+    if (weeks.length === 1) el("circle", { cx: x(0), cy: y(series[t.rid][0]), r: 4, fill: "var(--context)" }, svg);
+    p.style.transition = "stroke-width .15s";
+  }
+  const labels = [];
+  for (const rid of H.picks) {
+    const c = pickColor(rid);
+    el("path", { d: path(rid), fill: "none", stroke: c, "stroke-width": 2.5, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    series[rid].forEach((v, i) => el("circle", { cx: x(i), cy: y(v), r: 4, fill: c, stroke: "var(--surface)", "stroke-width": 2 }, svg));
+    labels.push({ rid, c, y: y(series[rid].at(-1)) });
+  }
+  // direct labels at the line ends, nudged apart
+  labels.sort((a, c) => a.y - c.y);
+  for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 18);
+  for (const L of narrow ? [] : labels) {
+    const t = H.teams.find((q) => q.rid === L.rid);
+    el("circle", { cx: W - m.r + 14, cy: L.y, r: 5, fill: L.c }, svg);
+    const tx = el("text", { x: W - m.r + 24, y: L.y + 4, class: "dl" }, svg);
+    tx.textContent = t.name.length > 20 ? t.name.slice(0, 19) + "…" : t.name;
+  }
+  // hover: crosshair + tooltip with every team that week
+  const cross = el("line", { y1: m.t, y2: Ht - m.b, stroke: "var(--ink)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 }, svg);
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; box.appendChild(tip);
+  const hit = el("rect", { x: m.l - 10, y: m.t, width: W - m.l - m.r + 20, height: Ht - m.t - m.b, fill: "transparent" }, svg);
+  const show = (evt) => {
+    const r = svg.getBoundingClientRect(), sx = (evt.clientX - r.left) * (W / r.width);
+    const i = weeks.length === 1 ? 0 : Math.max(0, Math.min(weeks.length - 1, Math.round(((sx - m.l) / (W - m.l - m.r)) * (weeks.length - 1))));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", .5);
+    const order = H.teams.slice().sort((a, c) => series[c.rid][i] - series[a.rid][i]);
+    tip.innerHTML = `<b>Week ${weeks[i]}</b>` + order.map((t) => { const c = pickColor(t.rid);
+      return `<div class="${c ? "hl" : ""}"><span><i${c ? ` style="background:${c}"` : ""}></i>${ranks[t.rid][i]}. ${esc(t.name)}</span><span>${series[t.rid][i].toFixed(1)}</span></div>`; }).join("");
+    tip.hidden = false;
+    const px = (x(i) / W) * r.width, bw = box.clientWidth;
+    tip.style.left = Math.max(0, Math.min(bw - tip.offsetWidth, px + 16 + tip.offsetWidth > bw ? px - 16 - tip.offsetWidth : px + 16)) + "px";
+    tip.style.top = "8px";
+  };
+  hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show);
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("opacity", 0); });
+}
+window.addEventListener("resize", () => { if (H && !$("history").hidden) drawChart(); });
+
 async function go(sample) {
   const id = $("leagueId").value.trim();
   if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }
@@ -139,7 +279,9 @@ async function go(sample) {
     const net = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
     const b = await SleeperCore.loadLeague(net, sample ? "sample" : id, (t) => status("note", t));
     const vals = SleeperCore.computeValues(b);
-    render(b, SleeperCore.powerRankings(b, vals), sample);
+    const rows = SleeperCore.powerRankings(b, vals);
+    H = { hist: SleeperCore.powerHistory(b, vals, rows), teams: b.teams, picks: rows.slice(0, 3).map((r) => r.rid) };
+    render(b, rows, sample);
   } catch (e) {
     const msg = String(e && e.message || e);
     status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);

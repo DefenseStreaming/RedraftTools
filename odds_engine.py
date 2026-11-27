@@ -1088,7 +1088,7 @@ def table(results, detail=False, rule="RRRRRRP", byes=(), each_seed=False):
     rule = seed_rule(rule)
     mixed = "R" in rule and "P" in rule
     n_seeds = len(results[0]["seed_pcts"]) if results else len(rule)
-    head = ["Rank", "Team"] + (["Record", "PF", "Proj W"] if detail else []) + ["Avg Seed", "#1 Seed Odds"]
+    head = ["Rank", "Team"] + (["Record", "PF", "Proj W"] if detail else []) + ["Avg Seed"]
     head += ["Bye Odds"] if byes else []
     head += ["Record Spot Odds", "Points Spot Odds"] if mixed else []
     head += [f"Seed {k + 1} Odds" for k in range(n_seeds)] if each_seed else []
@@ -1098,7 +1098,7 @@ def table(results, detail=False, rule="RRRRRRP", byes=(), each_seed=False):
         row = [str(i), r["team"]]
         if detail:
             row += [r["record"], f"{r['pf']:.1f}", f"{r['proj_wins']:.1f}"]
-        row += [fs(r["avg_seed"]), fp(r["seed1"])]
+        row += [fs(r["avg_seed"])]
         row += [fp(r["bye"])] if byes else []
         row += [fp(r["via_record"]), fp(r["via_points"])] if mixed else []
         row += [fp(v) for v in r["seed_pcts"]] if each_seed else []
@@ -1121,7 +1121,7 @@ def print_table(results, detail=False, rule="RRRRRRP", byes=(), each_seed=False)
     extra = f" | Bye Odds sums to {sum(r['bye'] for r in results) / 100:.2f} (should be {len(byes)})" if byes else ""
     print(f"\nSeeding: " + " ".join(f"{k + 1}:{'pts' if m == 'P' else 'rec'}" for k, m in enumerate(rule[:spots]))
           + (f" | byes: {', '.join(map(str, byes))}" if byes else ""))
-    print(f"Checks: #1 Seed sums to {sum(r['seed1'] for r in results):.1f}%{extra} | Playoff Odds sums to "
+    print(f"Checks: #1 Seed sums to {sum(r['seed1'] for r in results):.1f}% (not shown){extra} | Playoff Odds sums to "
           f"{sum(r['playoff'] for r in results) / 100:.2f} (should be {spots})")
 
 
@@ -1836,10 +1836,10 @@ def _selftest():
         assert abs(r["playoff"] - (r["via_record"] + r["via_points"])) < 1e-9
         assert abs(r["bye"] - r["seed1"]) < 1e-9
     head, rows = table(res, False, "RRRRRRP", [1])
-    assert head == ["Rank", "Team", "Avg Seed", "#1 Seed Odds", "Bye Odds", "Record Spot Odds",
+    assert head == ["Rank", "Team", "Avg Seed", "Bye Odds", "Record Spot Odds",
                     "Points Spot Odds", "Playoff Odds"] and len(rows) == 12
-    assert table(res, False, "RRRRRRR")[0] == ["Rank", "Team", "Avg Seed", "#1 Seed Odds", "Playoff Odds"]
-    assert len(table(res, False, "RRRRRRP", (), True)[0]) == 2 + 2 + 2 + 7 + 1
+    assert table(res, False, "RRRRRRR")[0] == ["Rank", "Team", "Avg Seed", "Playoff Odds"]
+    assert len(table(res, False, "RRRRRRP", (), True)[0]) == 2 + 1 + 2 + 7 + 1
     assert [int(r[0]) for r in rows] == list(range(1, 13))
     # season complete: one deterministic pass -> exactly 7 teams at 100%
     t2 = {i: {"wins": 14 - i, "losses": i, "ties": 0, "pf": 1500.0 - i, "name": f"T{i}", "weekly_scores": []}
