@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defense Streamer | Sleeper Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a scoreboard-style control strip on top, then three week-by-week leaderboards side by side. */
+:root {
+  --bg: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #f6f8f9;
+  --ink: #0f2230;
+  --muted: #5b6f7c;
+  --line: #d6dee3;
+  --accent: #0d6b4d;
+  --accent-ink: #ffffff;
+  --accent-soft: #dff1ea;
+  --warn-bg: #fff4d6;
+  --warn-ink: #6b4a00;
+  --bad-bg: #fde4e1;
+  --bad-ink: #7a1d12;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c171f; --surface: #14232d; --surface-2: #192c38; --ink: #e8f0f4; --muted: #93a8b5;
+    --line: #28404f; --accent: #3ec99a; --accent-ink: #06231a; --accent-soft: #123a2e;
+    --warn-bg: #3a2f10; --warn-ink: #f2d78a; --bad-bg: #3d1a16; --bad-ink: #f5b3aa; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c171f; --surface: #14232d; --surface-2: #192c38; --ink: #e8f0f4; --muted: #93a8b5;
+  --line: #28404f; --accent: #3ec99a; --accent-ink: #06231a; --accent-soft: #123a2e;
+  --warn-bg: #3a2f10; --warn-ink: #f2d78a; --bad-bg: #3d1a16; --bad-ink: #f5b3aa; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+h1 { font-family: var(--display); font-size: 40px; line-height: 1; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h2, h3 { text-wrap: balance; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 62ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.controls { display: grid; gap: 18px; grid-template-columns: 1fr; }
+@media (min-width: 860px) { .controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); } }
+label.field { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+input[type="text"], select {
+  width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px;
+  background: var(--surface-2); color: var(--ink); font: inherit;
+}
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button { font: inherit; min-height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); padding: 8px 14px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; font-family: var(--display); font-size: 22px; letter-spacing: .03em; padding: 6px 28px; }
+button:disabled { opacity: .6; cursor: progress; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 15px; min-height: 44px; }
+.check input { width: 20px; height: 20px; }
+.sliders { display: flex; flex-direction: column; gap: 14px; }
+.slider-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.slider-head span.name { font-weight: 600; }
+.slider-head span.pct { font-family: var(--display); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent); }
+.hint { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px; }
+.tiny { font-size: 13px; color: var(--muted); }
+.status { display: flex; flex-direction: column; gap: 6px; }
+.banner { border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.banner.sample { background: var(--warn-bg); color: var(--warn-ink); }
+.banner.error { background: var(--bad-bg); color: var(--bad-ink); }
+.banner.note { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.summary { font-size: 14px; color: var(--muted); }
+.summary b { color: var(--ink); }
+.boards { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .boards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.board { padding: 0; overflow: hidden; }
+.board h3 { font-family: var(--display); font-size: 26px; margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.board h3 small { font-family: var(--body); font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 8px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 14px; font-weight: 600; }
+th.num, td.num { text-align: right; }
+td { padding: 9px 14px; border-top: 1px solid var(--line); vertical-align: baseline; }
+td.team { white-space: nowrap; }
+.rk { color: var(--muted); display: inline-block; min-width: 1.6em; }
+.tm { font-weight: 600; }
+.vs { color: var(--muted); font-size: 13px; margin-left: 6px; }
+td.score { font-family: var(--display); font-size: 22px; font-weight: 700; text-align: right; }
+.pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.pill.free { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
+tr.top td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+.explain { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.explain b { color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) { button { transition: filter .15s; } button:hover:not(:disabled) { filter: brightness(1.08); } }
+/* site nav (shared with the other tools) */
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html" aria-current="page">Defense Streamer</a><a class="soon" href="#" aria-disabled="true">Power Rankings</a><a href="odds.html">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>Defense Streamer</h1>
+    <p class="sub">A better way to stream Fantasy Defenses. How bad is the offense ? How good is the defense ? Do you have custom defensive scoring? This ranks every NFL defense for the next three weeks based on your preferences.</p>
+  </header>
+
+  <section class="panel controls" aria-label="Settings">
+    <div>
+      <label class="field" for="leagueId">Sleeper league ID</label>
+      <input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472">
+      <p class="hint">Find it in the Sleeper link for your league.</p>
+      <div class="row" style="margin-top:12px">
+        <button id="run" class="primary" type="button">Run</button>
+        <button id="demo" type="button">Use sample data</button>
+      </div>
+      <div class="check"><input id="freeOnly" type="checkbox"><label for="freeOnly">Only show defenses nobody owns</label></div>
+      <div>
+        <label class="field" for="rows">Rows per week</label>
+        <select id="rows"><option value="10">10</option><option value="15" selected>15</option><option value="32">All 32</option></select>
+      </div>
+    </div>
+    <div class="sliders" id="sliders">
+      <div>
+        <div class="slider-head"><label class="name" for="wOpp">Opponent offense gives up</label><span class="pct" id="pOpp">36%</span></div>
+        <input id="wOpp" type="range" min="0" max="100" step="1" value="36">
+        <p class="hint">How many defense points the opposing offense usually hands out.</p>
+      </div>
+      <div>
+        <div class="slider-head"><label class="name" for="wDef">Defense's own scoring</label><span class="pct" id="pDef">24%</span></div>
+        <input id="wDef" type="range" min="0" max="100" step="1" value="24">
+        <p class="hint">How many points this defense scores compared with an average one.</p>
+      </div>
+      <div>
+        <div class="slider-head"><label class="name" for="wProj">Sleeper projection</label><span class="pct" id="pProj">40%</span></div>
+        <input id="wProj" type="range" min="0" max="100" step="1" value="40">
+        <p class="hint">Sleeper's own projected defense stats, scored with your league's settings.</p>
+      </div>
+      <div class="row">
+        <button id="reset" type="button">Reset to recommended (36 / 24 / 40)</button>
+        <span class="tiny" id="sumNote">The three always add to 100%.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="status" id="status" aria-live="polite"></section>
+  <div class="summary" id="summary"></div>
+  <section class="boards" id="boards" aria-label="Weekly leaderboards"></section>
+
+  <section class="panel explain">
+    <div><b>How the score works.</b> Each defense's score is the points we expect it to score in your league that week. It mixes the three weights above: how generous the opponent's offense has been, how good the defense itself is, and Sleeper's projection.</div>
+    <div>The first two come from every completed game this season, scored with your league's own defense settings. The model estimates defense quality and offense generosity together, so a defense is not credited for facing weak offenses. Early in the season the estimates are pulled toward average.</div>
+    <div>It does not see Vegas lines, the opponent's quarterback news or the weather. Use it to build a shortlist, then check those for your top picks.</div>
+  </section>
+</div>
+
+<script>
+/* ====================== CORE START (no DOM in here) ====================== */
+const ALIAS = { JAC: "JAX", WSH: "WAS", LA: "LAR", OAK: "LV", SD: "LAC", STL: "LAR" };
+const TIER_PREFIXES = ["pts_allow", "yds_allow"];
+const HOSTS = ["https://api.sleeper.com", "https://api.sleeper.app"];
+const API = "https://api.sleeper.app/v1";
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const norm = (t) => { t = String(t == null ? "" : t).trim().toUpperCase(); return ALIAS[t] || t; };
+const num = (v, d = 0) => { if (v === null || v === undefined || v === "") return d; const x = Number(v); return Number.isFinite(x) ? x : d; };
+const isDefId = (pid) => /^[A-Z]{2,3}$/.test(String(pid == null ? "" : pid));
+function roundHalfEven(x) { const f = Math.floor(x), d = x - f; if (d < 0.5) return f; if (d > 0.5) return f + 1; return f % 2 === 0 ? f : f + 1; }
+const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+
+function tierValue(scoring, prefix, value) {
+  let best = 0, bestLo = -1;
+  value = roundHalfEven(value);
+  const re = new RegExp("^" + prefix + "_(\\d+)(?:_(\\d+)|(p))?$");
+  for (const [key, w] of Object.entries(scoring)) {
+    if (typeof w !== "number") continue;
+    const m = re.exec(key);
+    if (!m) continue;
+    const lo = parseInt(m[1], 10);
+    const hi = m[3] ? Infinity : (m[2] !== undefined ? parseInt(m[2], 10) : lo);
+    if (lo <= value && value <= hi && lo > bestLo) { best = w; bestLo = lo; }
+  }
+  return best;
+}
+function defPoints(stats, scoring) {
+  const tierKeys = Object.keys(scoring).filter((k) => TIER_PREFIXES.some((p) => k.startsWith(p + "_")));
+  const tierSet = new Set(tierKeys);
+  let total = 0;
+  for (const [k, w] of Object.entries(scoring)) {
+    if (tierSet.has(k) || typeof w !== "number") continue;
+    if (hasOwn(stats, k)) total += num(stats[k]) * w;
+  }
+  for (const p of TIER_PREFIXES) {
+    const keys = tierKeys.filter((k) => k.startsWith(p + "_"));
+    if (!keys.length) continue;
+    const present = keys.filter((k) => hasOwn(stats, k));
+    if (present.length) total += present.reduce((a, k) => a + num(stats[k]) * scoring[k], 0);
+    else if (hasOwn(stats, p)) total += tierValue(scoring, p, num(stats[p]));
+  }
+  return total;
+}
+function projDefPoints(stats, scoring) {
+  const has = Object.keys(scoring).some((k) => typeof scoring[k] === "number" && hasOwn(stats, k)) ||
+    TIER_PREFIXES.some((p) => hasOwn(stats, p));
+  if (has) return defPoints(stats, scoring);
+  for (const fam of ["pts_ppr", "pts_half_ppr", "pts_std"]) if (hasOwn(stats, fam)) return num(stats[fam]);
+  return null;
+}
+function parseDefRows(data) {
+  const out = [];
+  if (data && !Array.isArray(data) && typeof data === "object") {
+    for (const [pid, v] of Object.entries(data)) {
+      if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+      const st = v.stats && typeof v.stats === "object" ? v.stats : v;
+      if (isDefId(pid)) out.push({ team: norm(v.team || pid), opp: norm(v.opponent) || null, stats: st });
+    }
+    return out;
+  }
+  for (const r of data || []) {
+    if (!r || typeof r !== "object") continue;
+    const pl = r.player && typeof r.player === "object" ? r.player : {};
+    const pid = String(r.player_id || pl.player_id || "");
+    const pos = String(pl.position || r.position || "").toUpperCase();
+    if (!(isDefId(pid) || pos === "DEF" || pos === "D/ST")) continue;
+    out.push({ team: norm(r.team || pl.team || pid), opp: norm(r.opponent) || null,
+      stats: r.stats && typeof r.stats === "object" ? r.stats : {} });
+  }
+  return out;
+}
+function parseSchedule(data) {
+  let items = data;
+  if (data && !Array.isArray(data) && typeof data === "object") items = data.games || data.schedule || Object.values(data);
+  const out = {};
+  for (const g of items || []) {
+    if (!g || typeof g !== "object") continue;
+    const week = Math.trunc(num(g.week));
+    const h = norm(g.home || g.home_team), a = norm(g.away || g.away_team);
+    if (!week) continue;
+    out[week] = out[week] || {};
+    if (h && a) { out[week][h] = a; out[week][a] = h; }
+    else if (g.team && g.opponent) out[week][norm(g.team)] = norm(g.opponent);
+  }
+  return out;
+}
+function fitEffects(games, lamDef, lamOff, iters = 60) {
+  const mu = mean(games.map((g) => g[2]));
+  const byDef = new Map(), byOff = new Map();
+  for (const [d, o, p] of games) {
+    if (!byDef.has(d)) byDef.set(d, []);
+    if (!byOff.has(o)) byOff.set(o, []);
+    byDef.get(d).push([o, p - mu]);
+    byOff.get(o).push([d, p - mu]);
+  }
+  const skill = new Map([...byDef.keys()].map((k) => [k, 0]));
+  const gen = new Map([...byOff.keys()].map((k) => [k, 0]));
+  for (let i = 0; i < iters; i++) {
+    for (const [d, lst] of byDef) skill.set(d, lst.reduce((s, [o, r]) => s + r - (gen.get(o) || 0), 0) / (lst.length + lamDef));
+    for (const [o, lst] of byOff) gen.set(o, lst.reduce((s, [d, r]) => s + r - (skill.get(d) || 0), 0) / (lst.length + lamOff));
+  }
+  return { mu, skill, gen };
+}
+function rankDefenses(fit, sched, weeks, teams, owners, proj, blend, oppWeight) {
+  const rows = [];
+  for (const t of [...teams].sort()) {
+    const cells = [];
+    for (const w of weeks) {
+      const o = sched[w] && sched[w][t];
+      if (!o) { cells.push(null); continue; }
+      const model = fit.mu + 2 * (oppWeight * (fit.gen.get(o) || 0) + (1 - oppWeight) * (fit.skill.get(t) || 0));
+      const pj = proj[w] && hasOwn(proj[w], t) ? proj[w][t] : null;
+      cells.push({ opp: o, model, proj: pj, val: pj === null ? model : (1 - blend) * model + blend * pj });
+    }
+    if (!cells.some(Boolean)) continue;
+    rows.push({ team: t, cells, skill: fit.skill.get(t) || 0, owner: owners[t] || null });
+  }
+  return rows;
+}
+function weekBoards(rows, nWeeks, freeOnly) {
+  const boards = [];
+  for (let wi = 0; wi < nWeeks; wi++) {
+    const items = rows.filter((r) => r.cells[wi] && !(freeOnly && r.owner)).map((r) => ({ row: r, cell: r.cells[wi] }));
+    items.sort((a, b) => (b.cell.val - a.cell.val) || (b.row.skill - a.row.skill) || (a.row.team < b.row.team ? -1 : 1));
+    boards.push(items);
+  }
+  return boards;
+}
+/* Turn the three slider percentages into the model's blend and its opponent/defense split. */
+function weightsFrom(pct) {
+  const [wo, ws, wp] = pct;
+  const modelShare = wo + ws;
+  return { blend: wp / 100, oppWeight: modelShare > 0 ? wo / modelShare : 0.5, modelOnly: wp === 0, projOnly: modelShare === 0 };
+}
+
+const statsUrls = (season, week) => {
+  const q = "season_type=regular&position%5B%5D=DEF";
+  return [...HOSTS.map((h) => `${h}/stats/nfl/${season}/${week}?${q}`),
+    `${API}/stats/nfl/regular/${season}/${week}`, `https://api.sleeper.app/stats/nfl/regular/${season}/${week}`];
+};
+const projectionUrls = (season, week) => HOSTS.map((h) => `${h}/projections/nfl/${season}/${week}?season_type=regular&position%5B%5D=DEF`);
+
+async function firstRows(net, urls) {
+  let last = null;
+  for (const url of urls) {
+    try {
+      const rows = parseDefRows(await net.fetchJson(url));
+      if (rows.length >= 20) return rows;
+    } catch (e) { last = e; }
+  }
+  throw last || new Error("no usable rows");
+}
+async function fetchSchedule(net, season) {
+  let last = null;
+  for (const h of HOSTS) {
+    try {
+      const s = parseSchedule(await net.fetchJson(`${h}/schedule/nfl/regular/${season}`));
+      if (Object.keys(s).length) return s;
+    } catch (e) { last = e; }
+  }
+  throw last || new Error("no schedule feed");
+}
+
+/* Everything the page needs, with no DOM. `net.fetchJson(url)` is real or sample data. */
+async function computeAll(net, leagueId, opts, progress) {
+  const say = progress || (() => {});
+  const { pct, freeOnly, shrinkDef = 4, shrinkOpp = 4, nWeeks = 3 } = opts;
+  const notes = [];
+  say("Reading your league…");
+  const league = await net.fetchJson(`${API}/league/${leagueId}`);
+  if (!league || typeof league !== "object" || !league.scoring_settings) throw new Error("That league was not found or is not public. Check the league ID.");
+  const scoring = league.scoring_settings;
+  const season = league.season;
+  const state = (await net.fetchJson(`${API}/state/nfl`)) || {};
+  let target = Math.trunc(num(state.week, 1)) || 1;
+  if (state.season_type && state.season_type !== "regular") target = 1;
+  const weeksAhead = [];
+  for (let w = target; w < target + nWeeks && w <= 18; w++) weeksAhead.push(w);
+  const past = [];
+  for (let w = 1; w < target; w++) past.push(w);
+  if (!past.length) throw new Error("No completed weeks yet to learn from (it is Week 1). Try again after the first games.");
+
+  say("Getting the NFL schedule…");
+  let sched = {};
+  try { sched = await fetchSchedule(net, season); }
+  catch (e) { notes.push("The NFL schedule feed was unavailable, so opponents come from the stats and projection feeds only."); }
+
+  say(`Scoring ${past.length} weeks of defense games with your settings…`);
+  const weekRows = await Promise.all(past.map(async (w) => {
+    try { return { w, rows: await firstRows(net, statsUrls(season, w)) }; } catch (e) { return { w, rows: [] }; }
+  }));
+  const games = [];
+  for (const { w, rows } of weekRows) {
+    for (const r of rows) {
+      const opp = r.opp || (sched[w] && sched[w][r.team]);
+      if (!opp) continue;
+      games.push([r.team, opp, defPoints(r.stats, scoring)]);
+    }
+  }
+  if (games.length < 100) throw new Error(`Only ${games.length} defense games could be read from Sleeper, which is too few. The stats feed may be unavailable right now.`);
+
+  say("Getting projections and ownership…");
+  const proj = {};
+  const projRows = await Promise.all(weeksAhead.map(async (w) => {
+    try { return { w, rows: await firstRows(net, projectionUrls(season, w)) }; } catch (e) { return { w, rows: [] }; }
+  }));
+  for (const { w, rows } of projRows) {
+    sched[w] = sched[w] || {};
+    for (const r of rows) if (r.opp && !sched[w][r.team]) sched[w][r.team] = r.opp;
+    const pw = {};
+    for (const r of rows) { const v = projDefPoints(r.stats, scoring); if (v !== null) pw[r.team] = v; }
+    if (Object.keys(pw).length) proj[w] = pw;
+  }
+  if (!weeksAhead.some((w) => sched[w] && Object.keys(sched[w]).length)) throw new Error("Could not find the NFL opponents for the coming weeks from any Sleeper source.");
+
+  const wt = weightsFrom(pct);
+  let blend = Object.keys(proj).length ? wt.blend : 0;
+  if (!Object.keys(proj).length) {
+    if (wt.blend > 0) notes.push("Sleeper projections were unavailable, so the ranking uses the history model only.");
+  } else if (Object.keys(proj).length < weeksAhead.length) notes.push("Sleeper projections are missing for some weeks; those weeks use the history model only.");
+
+  const owners = {};
+  try {
+    const [rosters, users] = await Promise.all([net.fetchJson(`${API}/league/${leagueId}/rosters`), net.fetchJson(`${API}/league/${leagueId}/users`)]);
+    const um = {};
+    for (const u of users || []) um[u.user_id] = u;
+    for (const r of rosters || []) {
+      const u = um[r.owner_id] || {};
+      const nm = (u.metadata && u.metadata.team_name) || u.display_name || `Roster ${r.roster_id}`;
+      for (const pid of r.players || []) if (isDefId(pid)) owners[norm(pid)] = nm;
+    }
+  } catch (e) { notes.push("League rosters could not be read, so ownership is not shown."); }
+
+  const fit = fitEffects(games, shrinkDef, shrinkOpp);
+  const teams = new Set([...fit.skill.keys()]);
+  for (const w of weeksAhead) for (const t of Object.keys(sched[w] || {})) teams.add(t);
+  const rows = rankDefenses(fit, sched, weeksAhead, teams, owners, proj, blend, wt.oppWeight);
+  const boards = weekBoards(rows, weeksAhead.length, freeOnly && Object.keys(owners).length > 0);
+  return { leagueName: league.name || "Your league", weeksAhead, past, nGames: games.length, mu: fit.mu, blend, oppWeight: wt.oppWeight, boards, notes };
+}
+/* ======================= CORE END ======================= */
+
+/* ---------------- sample league (same code path, fake network) ---------------- */
+function makeSampleNet() {
+  let seed = 20260101;
+  const rand = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const gauss = () => { let u = 0, v = 0; while (!u) u = rand(); while (!v) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const teams = "ARI ATL BAL BUF CAR CHI CIN CLE DAL DEN DET GB HOU IND JAX KC LV LAC LAR MIA MIN NE NO NYG NYJ PHI PIT SF SEA TB TEN WAS".split(" ");
+  const skill = {}, gen = {};
+  teams.forEach((t) => { skill[t] = gauss() * 1.0; gen[t] = gauss() * 1.0; });
+  const sched = {};
+  for (let w = 1; w <= 18; w++) {
+    const order = teams.slice();
+    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const skip = w === 13 ? 4 : 0; // a few byes in week 13
+    sched[w] = {};
+    for (let i = skip; i < order.length; i += 2) { sched[w][order[i]] = order[i + 1]; sched[w][order[i + 1]] = order[i]; }
+  }
+  const scoring = { sack: 1, int: 2, fum_rec: 2, def_td: 6, safe: 2, pts_allow_0: 10, pts_allow_1_6: 7, pts_allow_7_13: 4, pts_allow_14_20: 1,
+    pts_allow_21_27: 0, pts_allow_28_34: -1, pts_allow_35p: -4, yds_allow_0_99: 5, yds_allow_100_199: 3, yds_allow_200_299: 2,
+    yds_allow_300_349: 0, yds_allow_350_399: -1, yds_allow_400_449: -3, yds_allow_450_499: -5, yds_allow_500_549: -6, yds_allow_550p: -7 };
+  const cache = {};
+  const actual = (w, t) => {
+    const k = w + t; if (cache[k]) return cache[k];
+    const o = sched[w][t];
+    return (cache[k] = { sack: Math.max(0, Math.trunc(2.2 + skill[t] + gen[o] + 1.5 * gauss())), int: Math.max(0, Math.trunc(0.9 + 0.2 * skill[t] + 0.2 * gen[o] + 0.9 * gauss())),
+      pts_allow: Math.max(0, Math.trunc(21 - 2 * skill[t] + 2 * gen[o] + 7 * gauss())), yds_allow: Math.max(80, Math.trunc(330 + 60 * gauss())) });
+  };
+  const rosters = [{ roster_id: 1, owner_id: "u1", players: ["DAL", "SEA", "BUF"] }, { roster_id: 2, owner_id: "u2", players: ["BAL", "PHI"] }, { roster_id: 3, owner_id: "u3", players: ["DEN"] }];
+  const users = [{ user_id: "u1", display_name: "Your Team" }, { user_id: "u2", metadata: { team_name: "Gridiron Gang" } }, { user_id: "u3", display_name: "Fourth & Long" }];
+  return {
+    fetchJson: async (url) => {
+      let m;
+      if (/\/state\/nfl$/.test(url)) return { week: 12, season_type: "regular" };
+      if (/\/rosters$/.test(url)) return rosters;
+      if (/\/users$/.test(url)) return users;
+      if (/\/v1\/league\/[^/]+$/.test(url)) return { name: "Sample league", season: "2026", scoring_settings: scoring };
+      if ((m = /\/stats\/nfl\/(?:regular\/)?2026\/(\d+)/.exec(url))) { const w = +m[1]; return teams.filter((t) => sched[w][t]).map((t) => ({ player_id: t, team: t, opponent: sched[w][t], stats: actual(w, t) })); }
+      if (/\/schedule\/nfl\/regular\//.test(url)) return Object.entries(sched).flatMap(([w, mp]) => Object.entries(mp).filter(([a, b]) => a < b).map(([a, b]) => ({ week: +w, home: a, away: b })));
+      if ((m = /\/projections\/nfl\/2026\/(\d+)/.exec(url))) { const w = +m[1]; return teams.filter((t) => sched[w][t]).map((t) => ({ player_id: t, team: t, opponent: sched[w][t],
+        stats: { sack: 2.2 + skill[t] + gen[sched[w][t]], int: 0.9 + 0.2 * skill[t] + 0.2 * gen[sched[w][t]], pts_allow: 21 - 2 * skill[t] + 2 * gen[sched[w][t]] } })); }
+      throw new Error("sample: unknown url " + url);
+    },
+  };
+}
+const liveNet = {
+  fetchJson: async (url) => {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 30000);
+    try {
+      const res = await fetch(url, { signal: ctl.signal });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    } finally { clearTimeout(timer); }
+  },
+};
+
+/* ------------------------------ page ------------------------------ */
+if (typeof document !== "undefined") {
+  const $ = (id) => document.getElementById(id);
+  const REC = [36, 24, 40];
+  let pct = REC.slice();
+  let busy = false;
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+  function setPct(next) {
+    pct = next;
+    $("wOpp").value = pct[0]; $("wDef").value = pct[1]; $("wProj").value = pct[2];
+    $("pOpp").textContent = pct[0] + "%"; $("pDef").textContent = pct[1] + "%"; $("pProj").textContent = pct[2] + "%";
+  }
+  function onSlide(i) {
+    const ids = ["wOpp", "wDef", "wProj"];
+    const v = Math.max(0, Math.min(100, parseInt($(ids[i]).value, 10) || 0));
+    const rest = 100 - v;
+    const others = [0, 1, 2].filter((k) => k !== i);
+    const s = pct[others[0]] + pct[others[1]];
+    const next = pct.slice(); next[i] = v;
+    if (s === 0) { next[others[0]] = Math.floor(rest / 2); next[others[1]] = rest - Math.floor(rest / 2); }
+    else { next[others[0]] = Math.round((pct[others[0]] / s) * rest); next[others[1]] = rest - next[others[0]]; }
+    setPct(next);
+  }
+  ["wOpp", "wDef", "wProj"].forEach((id, i) => $(id).addEventListener("input", () => onSlide(i)));
+  $("reset").addEventListener("click", () => setPct(REC.slice()));
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function banner(kind, text) { return `<div class="banner ${kind}">${esc(text)}</div>`; }
+
+  function render(res, sample) {
+    const n = parseInt($("rows").value, 10) || 15;
+    $("status").innerHTML = (sample ? banner("sample", "Sample data. These are made-up defense results so you can see the layout. Enter your league ID and press Run for your real numbers.") : "") +
+      res.notes.map((t) => banner("note", t)).join("");
+    const blendPct = Math.round(res.blend * 100);
+    $("summary").innerHTML = `<b>${esc(res.leagueName)}</b> · learned from weeks ${res.past[0]}–${res.past[res.past.length - 1]} (${res.nGames} defense games) · average defense score ${res.mu.toFixed(1)} per game · ${100 - blendPct}% history model / ${blendPct}% Sleeper projection`;
+    $("boards").innerHTML = res.boards.map((bd, wi) => {
+      const body = bd.slice(0, n).map((it, i) => `<tr class="${i < 3 ? "top" : ""}"><td class="team"><span class="rk">${i + 1}.</span><span class="tm">${esc(it.row.team)}</span><span class="vs">v ${esc(it.cell.opp)}</span></td>` +
+        `<td class="score">${it.cell.val.toFixed(1)}</td><td><span class="pill ${it.row.owner ? "" : "free"}" title="${esc(it.row.owner || "Free")}">${esc(it.row.owner || "Free")}</span></td></tr>`).join("");
+      return `<div class="panel board"><h3>Week ${res.weeksAhead[wi]}${wi === 0 ? "<small>this week</small>" : ""}</h3><div style="overflow-x:auto"><table><thead><tr><th>Rank</th><th class="num">Score</th><th>Avail</th></tr></thead><tbody>${body || '<tr><td colspan="3" class="tiny">No defenses to show.</td></tr>'}</tbody></table></div></div>`;
+    }).join("");
+  }
+
+  let last = null, lastSample = true;
+  async function go(sample) {
+    if (busy) return;
+    const id = $("leagueId").value.trim();
+    if (!sample && !/^\d{6,}$/.test(id)) { $("status").innerHTML = banner("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }
+    busy = true; $("run").disabled = true; $("demo").disabled = true;
+    const opts = { pct, freeOnly: $("freeOnly").checked };
+    try {
+      const net = sample ? makeSampleNet() : liveNet;
+      const res = await computeAll(net, sample ? "sample" : id, opts, (m) => { $("status").innerHTML = banner("note", m); });
+      last = res; lastSample = sample;
+      if (!sample) store.set("defenseStreamerLeague", id);
+      render(res, sample);
+    } catch (e) {
+      const blocked = e instanceof TypeError || /Failed to fetch|NetworkError|Load failed|aborted/i.test(String(e.message || e));
+      $("status").innerHTML = banner("error", blocked
+        ? "This page could not reach Sleeper. A page viewed inside Claude is blocked from other websites. Open the saved file from your own computer or put it on your own website, then run again."
+        : String(e.message || e));
+    } finally { busy = false; $("run").disabled = false; $("demo").disabled = false; }
+  }
+  $("run").addEventListener("click", () => go(false));
+  $("demo").addEventListener("click", () => go(true));
+  $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
+  $("rows").addEventListener("change", () => { if (last) render(last, lastSample); });
+  const saved = store.get("defenseStreamerLeague");
+  if (saved) $("leagueId").value = saved;
+  go(true); // open in a working state with sample data
+}
+if (typeof module !== "undefined") module.exports = { defPoints, tierValue, parseDefRows, parseSchedule, fitEffects, rankDefenses, weekBoards, weightsFrom, computeAll, projDefPoints, roundHalfEven };
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quick Odds Calculator | Old Balls Tools</title>
+<title>Quick Odds Calculator | Sleeper Tools</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Layout idea: settings strip, editable team table, live odds table that redraws on every change. */
@@ -60,7 +60,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 </style>
 </head>
 <body>
-<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Old Balls Tools</a><a href="defense.html">Defense Streamer</a><a class="soon" href="#" aria-disabled="true">Power Rankings</a><a href="odds.html">Playoff Odds</a></div></nav>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a class="soon" href="#" aria-disabled="true">Power Rankings</a><a href="odds.html">Playoff Odds</a></div></nav>
 <div class="wrap">
   <header>
     <h1>Quick Odds Calculator</h1>
@@ -78,7 +78,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
       <div><label class="f" for="spots">Playoff spots</label><select id="spots"></select></div>
       <div><label class="f" for="pts">Spots decided by points scored</label><select id="pts"></select></div>
     </div>
-    <p class="hint">Teams are seeded by record first (ties broken by points scored). Any spots set to points go to the highest scorers who missed on record. Old Balls uses 7 spots with 1 by points.</p>
+    <p class="hint">Teams are seeded by record first (ties broken by points scored). Any spots set to points go to the highest scorers who missed on record. A common setup is 7 spots with 1 by points.</p>
     <div class="grid" style="margin-top:12px">
       <div><label class="f" for="swing">Weekly scoring swing (pts)</label><input id="swing" type="number" min="5" max="60" value="24"><p class="hint">Typical spread in one team's weekly score.</p></div>
       <div><label class="f" for="sims">Simulations</label><select id="sims"><option>2000</option><option selected>10000</option><option>30000</option></select></div>
