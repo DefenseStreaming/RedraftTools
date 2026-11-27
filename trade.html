@@ -96,7 +96,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27f";
+  var MINE = "2026-11-27g";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -146,7 +146,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     <div><b>Lineup change</b> is how much each team's best starting lineup gains or loses per week for the rest of the season. A trade can be even on value and still help both teams. If a team takes back more players than it sends, it has to drop its lowest-value players.</div>
   </section>
 </div>
-<script src="sleeper-core.js?v=2026-11-27f"></script>
+<script src="sleeper-core.js?v=2026-11-27g"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

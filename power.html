@@ -155,8 +155,13 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   .ptr-body p{margin:0;font-size:2.05cqw;line-height:1.35}.ptr-teams{font-size:1.65cqw;color:#4f6370;line-height:1.35}
   .pg-note{flex:none;font-size:1.45cqw;color:#4f6370;margin:1.3cqw 0 0;line-height:1.4}
   /* page 3 */
+  /* page 3 is laid out landscape and turned a quarter-turn on the portrait sheet (works in every browser,
+     unlike @page landscape). The page is 100cqw wide and 100/0.86 = 116.28cqw tall. */
+  .pg-land{position:relative}
+  .pg-land .land{position:absolute;top:0;left:0;width:116.28cqw;height:100cqw;transform-origin:0 0;
+    transform:translateY(116.28cqw) rotate(-90deg);display:flex;flex-direction:column;padding:0 1cqw}
   .pg-chart{flex:1;min-height:0;overflow:hidden}
-  .pg-chart svg{display:block;width:100%!important;height:102cqw!important}
+  .pg-chart svg{display:block;width:100%!important;height:88cqw!important}
   .pg-chart text.tierlbl{text-decoration:none}
   .pg-chart .tip{display:none!important}
 }
@@ -165,7 +170,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27f";
+  var MINE = "2026-11-27g";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -224,13 +229,13 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   <section class="pg"><div class="pg-head"><div class="pg-title pdf-league"></div><div class="pg-sub"><b>Power Rankings</b><br><span class="pdf-when"></span></div></div><div class="pg-tiles" id="pdfTiles"></div></section>
   <section class="pg"><div class="pg-head"><div class="pg-title">Tier guide</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-tiers" id="pdfTiers"></div>
     <p class="pg-note"><b>How the score works:</b> 50% record, 30% points for and 20% roster strength. Each is a z-score against the league average, weighted, then scaled so 50 is average: (weighted z + 2.5) ÷ 5 × 100. Roster strength is the trade value of each team's best starting lineup plus 15% of its top six bench players (the same player values as the Trade Calculator). Made with Sleeper Tools.</p></section>
-  <section class="pg"><div class="pg-head"><div class="pg-title">Score by week</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-chart viz chartbox" id="pdfChart"></div></section>
+  <section class="pg pg-land"><div class="land"><div class="pg-head"><div class="pg-title">Score by week</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-chart viz chartbox" id="pdfChart"></div></div></section>
 </div>
 <dialog id="tierDlg" aria-labelledby="tierDlgTitle">
   <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
   <div class="body"><div class="range" id="tierDlgRange"></div><p class="desc" id="tierDlgDesc"></p><p class="who" id="tierDlgWho"></p></div>
 </dialog>
-<script src="sleeper-core.js?v=2026-11-27f"></script>
+<script src="sleeper-core.js?v=2026-11-27g"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -356,12 +361,12 @@ $("picks").addEventListener("click", (e) => {
 });
 function el(tag, attrs, parent) { const n = document.createElementNS(SVGNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
 // screen chart, plus a print-sized copy that is always ready (iPhone may end "printing" before the PDF is made)
-function drawBoth() { drawChart(); drawChart(760, 860, $("pdfChart")); }
+function drawBoth() { drawChart(); drawChart(1000, 760, $("pdfChart")); }
 function drawChart(forceW, forceH, target) {
   const box = target || $("chartbox"); box.innerHTML = "";
   const { weeks, series, ranks } = H.hist;
   const W = forceW || Math.max(300, box.clientWidth), narrow = W < 640;
-  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 150, r: narrow ? 8 : (forceW ? 160 : 196), t: 12, b: 30 };
+  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 150, r: narrow ? 8 : (forceW ? 196 : 196), t: 12, b: 30 };
   const all = Object.values(series).flat();
   const lo = Math.min(20, Math.floor((Math.min(...all) - 4) / 10) * 10), hi = Math.max(90, Math.ceil((Math.max(...all) + 4) / 10) * 10);
   const x = (i) => m.l + (weeks.length === 1 ? (W - m.l - m.r) / 2 : (i / (weeks.length - 1)) * (W - m.l - m.r));
@@ -416,7 +421,7 @@ function drawChart(forceW, forceH, target) {
     const lg = el("g", { opacity: L.dim ? 0.3 : 1 }, svg);
     el("circle", { cx: W - m.r + 14, cy: L.y, r: 4.5, fill: L.c }, lg);
     const tx = el("text", { x: W - m.r + 24, y: L.y + 4, class: "dl" }, lg);
-    const maxc = forceW ? 16 : 20;
+    const maxc = forceW ? 18 : 20;
     const nm = el("tspan", {}, tx); nm.textContent = t.name.length > maxc ? t.name.slice(0, maxc - 1) + "…" : t.name;
     const sc = el("tspan", { class: "dls", dx: 5 }, tx); sc.textContent = last(series[L.rid]).toFixed(1);   // this week's score
   }
