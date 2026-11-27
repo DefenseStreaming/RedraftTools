@@ -711,8 +711,6 @@ def build_team_lineups(teams, league, players_db, weeks, week_feeds, hist_feeds,
         tl = TeamLineup(cands, lineup, weeks)
         tl.estimate_typical(rng)
         lineups[rid] = tl
-        if not args.no_injuries:
-            diag.setdefault("injury_detail", []).extend(injury_detail(rid, tl, players_db, weeks, repl))
     missing = [k for k in returns if k not in used_returns]
     if missing:
         raise RuntimeError("--return: no rostered player matched " + ", ".join(missing)
@@ -723,8 +721,23 @@ def build_team_lineups(teams, league, players_db, weeks, week_feeds, hist_feeds,
 # --------------------------------------------------------------------------- #
 # team strength model (shrinkage)
 # --------------------------------------------------------------------------- #
-def injury_detail(rid, tl, players_db, weeks, repl):
-    """Key injured players on one team, for the web page's injury panel."""
+def live_player_points(rows):
+    """{player_id: points} for everyone who has scored in the week in progress."""
+    out = {}
+    for row in rows or []:
+        pp = row.get("players_points") or {}
+        if not pp:
+            pp = dict(zip([str(x) for x in row.get("starters") or []], row.get("starters_points") or []))
+        for pid, pts in pp.items():
+            if num(pts) != 0:
+                out[str(pid)] = num(pts)
+    return out
+
+
+def injury_detail(rid, tl, players_db, weeks, repl, live_pts=None):
+    """Key injured players on one team, for the web page's injury panel.
+    live_pts: points already scored in weeks[0] when that week is in progress."""
+    live_pts = live_pts or {}
     out = []
     for i, c in enumerate(tl.cands):
         st = c.status.strip()
@@ -732,25 +745,41 @@ def injury_detail(rid, tl, players_db, weeks, repl):
         flagged = (c.p0 < 0.95 or c.ret < 0.9 or c.trust) and st.lower() not in ("", "active")
         if not flagged or c.nominal < repl.get(pri, 0) + 1.5:
             continue
-        has_pts = [wi for wi, w in enumerate(weeks) if c.weekly.get(w, c.nominal) is not None]
-        plays_next = c.p0 if 0 in has_pts else 0.0
-        if c.trust and c.p0 > 0:                       # IR / PUP / suspended: projections decide
-            note = (f"Projected back week {weeks[has_pts[0]]}" if has_pts
-                    else "Not projected back this regular season")
-        elif plays_next == 0:
-            note = f"Misses week {weeks[0]}, then {c.ret:.0%} chance each week to return"
+        has_pts = {wi for wi, w in enumerate(weeks) if c.weekly.get(w, c.nominal) is not None}
+        avail, p = [], c.p0                            # chance he is available each week, as the sim draws it
+        for wi in range(len(weeks)):
+            if wi:
+                p = p * (1 - c.hz) + (1 - p) * (c.ret if wi >= c.lock else 0.0)
+            avail.append(p if wi in has_pts else 0.0)
+        played = live_pts.get(c.pid)
+        s0 = 1 if played is not None else 0            # his week-in-progress game is already done
+        parts = [f"Played week {weeks[0]} ({played:g} pts)"] if played is not None else []
+        plays_next = avail[s0] if s0 < len(weeks) else None
+        if s0 >= len(weeks):
+            parts.append("regular season is over after this week")
+        elif c.trust and c.p0 > 0:                     # IR / PUP / suspended: projections decide
+            back = min((wi for wi in has_pts if wi >= s0), default=None)
+            parts.append(f"projected back week {weeks[back]}" if back is not None
+                         else "not projected back this regular season")
+        elif s0 not in has_pts:                        # Sleeper projects nothing for him that week
+            back = min((wi for wi in has_pts if wi > s0), default=None)
+            parts.append(f"projected out week {weeks[s0]}" + (f", back as early as week {weeks[back]}"
+                         if back is not None else " and the rest of the regular season"))
+        elif plays_next < 0.005:
+            parts.append(f"misses week {weeks[s0]}, then {c.ret:.0%} chance each week to return")
         elif plays_next < 0.5:
-            note = f"{plays_next:.0%} to play week {weeks[0]}, then {c.ret:.0%} each week"
+            parts.append(f"{plays_next:.0%} to play week {weeks[s0]}, then {c.ret:.0%} each week")
         else:
-            note = f"{plays_next:.0%} to play week {weeks[0]}"
+            parts.append(f"{plays_next:.0%} to play week {weeks[s0]}")
+        note = ". ".join(x[0].upper() + x[1:] for x in parts)
         hit = 0.0                                      # starting-lineup points lost when he sits
-        if has_pts:
-            wi = has_pts[0]
+        wi = min((w for w in has_pts if w >= s0), default=None)
+        if wi is not None:
             hit = max(0.0, tl.score(wi, 0) - tl.score(wi, 1 << i))
         info = players_db.get(c.pid) or {}
         out.append({"roster_id": rid, "player": c.name, "pos": pri, "nfl": str(info.get("team") or ""),
-                    "status": st, "play_next": round(100 * plays_next), "note": note,
-                    "pts": round(c.nominal, 1), "hit": round(hit, 1)})
+                    "status": st, "play_next": None if plays_next is None else round(100 * plays_next),
+                    "played": played, "note": note, "pts": round(c.nominal, 1), "hit": round(hit, 1)})
     return out
 
 
@@ -1273,8 +1302,14 @@ def run_league(args, quiet=False):
                    sims=1 if complete else args.simulations, rng=rng, live=live)
     results = build_results(teams, sim, rule, byes)
     names = {rid: t["name"] for rid, t in teams.items()}
-    args._injuries = sorted(({**d, "team": names[d["roster_id"]]} for d in (diag or {}).get("injury_detail", [])),
+    live_pts = live_player_points(rows_by_week.get(weeks[0], [])) if live else {}
+    detail = []
+    if lineups and not args.no_injuries:
+        for rid, tl in lineups.items():
+            detail += injury_detail(rid, tl, players_db, weeks, (diag or {}).get("repl", {}), live_pts)
+    args._injuries = sorted(({**d, "team": names[d["roster_id"]]} for d in detail),
                             key=lambda d: (-d["hit"], -d["pts"]))
+    args._live = bool(live)
     args._first_week = weeks[0] if weeks else None
     args._have_lineups = bool(lineups)
     if not quiet:
@@ -1834,6 +1869,19 @@ def _selftest():
     outdb = {"p2": {"injury_status": "Out"}, "p3": {"injury_status": "Questionable"}}
     assert build_live(lr, lt, feed, {1: 100.0, 2: 100.0}, {}, players_db=outdb)[1][:2] == (20.0, 10.0)
     assert ruled_out({"status": "Injured Reserve"}) and not ruled_out({"injury_status": "Questionable"})
+    # injury panel: an Out player who already played in the live week
+    assert live_player_points([{"players_points": {"w": 14.2, "z": 0}}]) == {"w": 14.2}
+    lu1 = Lineup(["WR"], {"WR": 2.0})
+    out_c = Cand("w", "Watson", frozenset({"WR"}), 16.0, 0.0, 0.75, 0.04, "Out")
+    bk = Cand("b", "Backup", frozenset({"WR"}), 9.0, 1.0, 1.0, 0.0, "")
+    tlw = TeamLineup([out_c, bk], lu1, [12, 13, 14])
+    for c_ in tlw.cands:
+        c_.weekly = {12: c_.nominal, 13: c_.nominal, 14: c_.nominal}
+    pre = injury_detail(1, tlw, {}, [12, 13, 14], {"WR": 2.0})[0]
+    assert pre["note"].startswith("Misses week 12") and pre["play_next"] == 0, pre
+    post = injury_detail(1, tlw, {}, [12, 13, 14], {"WR": 2.0}, {"w": 14.2})[0]
+    assert post["note"] == "Played week 12 (14.2 pts). 75% to play week 13" and post["play_next"] == 75, post
+    assert post["hit"] == 7.0, post
     assert build_live(rows, {1: {}, 2: {}}, None, {1: 100.0, 2: 100.0}, {}, final=True)[1] == (20.0, 0.0, 0.0)
     # power rankings: weights, scaling, dropped component
     st = {1: {"win": 0.9, "pf": 140.0, "roster": 130.0}, 2: {"win": 0.5, "pf": 125.0, "roster": 125.0},
@@ -1981,6 +2029,7 @@ def run_web(league_id, simulations=5000, questionable_prob=0.78, record_seeds=6,
     return json.dumps({"head": head, "rows": rows, "results": results, "sims": args.simulations,
                        "rule": rule, "byes": bys, "spots": min(len(rule), len(results)),
                        "injuries": getattr(args, "_injuries", []), "week": getattr(args, "_first_week", None),
+                       "live": getattr(args, "_live", False),
                        "injuries_modelled": not args.no_injuries and getattr(args, "_have_lineups", False)})
 
 
