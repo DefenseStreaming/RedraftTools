@@ -231,7 +231,9 @@ function drawInjuries(r) {
   $("injTable").hidden = !list.length;
   if (!r.injuries_modelled) { $("injLede").textContent = "Injuries weren't modelled on this run because Sleeper's projections couldn't be loaded, so the odds use scoring history only."; return; }
   if (!list.length) { $("injLede").textContent = "No injured starters right now. Everyone who matters is listed as healthy."; return; }
-  $("injLede").textContent = `${list.length} injured player${list.length === 1 ? "" : "s"} who would start, biggest lineup hit first. Week ${r.week} is the next game simulated.`;
+  $("injLede").textContent = `${list.length} injured player${list.length === 1 ? "" : "s"} who would start, biggest lineup hit first. ` + (r.live
+    ? `Week ${r.week} is in progress: points already scored are locked in, and anyone whose game is over is judged on the week after.`
+    : `Week ${r.week} is the next game simulated.`);
   const cls = (s) => /quest/i.test(s) ? "q" : /out|doubt|ir|pup|sus|injured/i.test(s) ? "o" : "";
   $("injBody").innerHTML = list.map((x) => `<tr>
     <td class="tm pl">${esc(x.player)}<small>${esc(x.pos)}${x.nfl ? " · " + esc(x.nfl) : ""}</small></td>
