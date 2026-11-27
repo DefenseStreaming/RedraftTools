@@ -488,6 +488,107 @@
     return { players, repl: vals.repl, haveProj: vals.haveProj, dynasty: true, teamPicks, seasons, rounds };
   }
 
+  /* ---------------- weekly rankings ----------------
+     score = 75% Sleeper's projection for that week + 25% form (season average, or average of his last
+     few games), both scored with the league's settings. Form only uses games before the chosen week. */
+  const WEEKLY_PROJ = 0.75, RECENT_GAMES = 3;
+  const WEEKLY_POS = ["QB", "RB", "WR", "TE"];
+  const statUrls = (season, week) => {
+    const q = "season_type=regular&" + POSITIONS.map((p) => "position%5B%5D=" + p).join("&");
+    return HOSTS.map((h) => `${h}/stats/nfl/${season}/${week}?${q}`);
+  };
+  // raw rows from Sleeper's projections or stats feed for one week (null if it can't be read)
+  async function loadWeekRows(net, season, week, kind = "projections") {
+    try {
+      const urls = kind === "stats" ? statUrls(season, week) : projUrls(season, week);
+      let rows = await firstOk(net, urls, (d) => d && (Array.isArray(d) ? d.length : Object.keys(d).length) > (kind === "stats" ? 0 : 50));
+      if (!Array.isArray(rows)) rows = Object.entries(rows).map(([pid, r]) => (r && r.player_id ? r : { player_id: pid, stats: r }));
+      return rows;
+    } catch (e) { return null; }
+  }
+  const rowPid = (r) => String(r.player_id || (r.player && r.player.player_id) || "");
+  // { pid: {pts, played} } for one finished week: from the stats feed, or the league's matchups if that is missing
+  function weekPoints(b, rows, w) {
+    const out = {};
+    const info = (pid) => b.db[pid] || b.rowInfo[pid] || {};
+    if (rows && rows.length) {
+      for (const r of rows) {
+        const pid = rowPid(r);
+        if (!pid) continue;
+        const pos = mainPos(info(pid)) || mainPos(r.player) || mainPos(r);
+        if (!pos) continue;
+        const v = num(projPoints(r, b.scoring, pos));
+        const st = r.stats || {};
+        const played = "gp" in st ? num(st.gp) > 0 : v !== 0;
+        if (played || v !== 0) out[pid] = { pts: v, played };
+      }
+      return out;
+    }
+    for (const row of b.matchups[w] || []) {
+      for (const [pid, pts] of Object.entries(row.players_points || {})) if (num(pts) !== 0) out[pid] = { pts: num(pts), played: true };
+    }
+    return out;
+  }
+  /* o: { week, projRows, points: {w: weekPoints}, done (last finished week), form: "season"|"recent", recent } */
+  function weeklyRankings(b, o) {
+    const info = (pid) => b.db[pid] || b.rowInfo[pid] || {};
+    const form = o.form === "recent" ? "recent" : "season";
+    const recentN = o.recent || RECENT_GAMES;
+    const owner = {};
+    for (const t of b.teams) for (const pid of t.players) owner[pid] = t;
+    const proj = {}, opp = {}, rowPl = {}, teamPlays = new Set();
+    for (const r of o.projRows || []) {
+      const pid = rowPid(r);
+      if (!pid) continue;
+      const pos = mainPos(info(pid)) || mainPos(r.player) || mainPos(r);
+      if (!WEEKLY_POS.includes(pos)) continue;
+      const v = num(projPoints(r, b.scoring, pos));
+      rowPl[pid] = r.player || {};
+      if (r.opponent) opp[pid] = String(r.opponent);
+      if (v > 0) { proj[pid] = v; const tm = r.team || (r.player && r.player.team) || info(pid).team; if (tm) teamPlays.add(String(tm).toUpperCase()); }
+    }
+    const histTo = Math.min(o.week - 1, o.done);
+    const result = o.week <= o.done ? "final" : o.week === o.done + 1 && o.points[o.week] ? "live" : null;
+    const pids = new Set(Object.keys(proj));
+    for (const pid of Object.keys(owner)) pids.add(pid);       // rostered players on bye / out still show for their team
+    const rows = [];
+    for (const pid of pids) {
+      const inf = Object.keys(info(pid)).length ? info(pid) : rowPl[pid] || {};
+      const pos = mainPos(inf);
+      if (!WEEKLY_POS.includes(pos)) continue;
+      const games = [];
+      for (let w = 1; w <= histTo; w++) { const g = o.points[w] && o.points[w][pid]; if (g && g.played) games.push(g.pts); }
+      const seasonAvg = games.length ? mean(games) : null;
+      const recent = games.slice(-recentN);
+      const recentAvg = recent.length ? mean(recent) : null;
+      const formAvg = form === "recent" ? recentAvg : seasonAvg;
+      const p = proj[pid] || 0;
+      const nfl = String(inf.team || "").toUpperCase();
+      const playing = p > 0;
+      const score = playing ? WEEKLY_PROJ * p + (1 - WEEKLY_PROJ) * (formAvg === null ? p : formAvg) : 0;
+      const t = owner[pid];
+      const act = result && o.points[o.week] ? o.points[o.week][pid] : null;
+      rows.push({ pid, pos, name: inf.full_name || [inf.first_name, inf.last_name].filter(Boolean).join(" ") || pid, nfl: inf.team || "",
+        opp: opp[pid] || "", injury: inf.injury_status || "", proj: p, seasonAvg, recentAvg, form: formAvg, games: games.length, score, playing,
+        status: playing ? "on" : nfl && teamPlays.size > 20 && !teamPlays.has(nfl) ? "bye" : "out",
+        ownerRid: t ? t.rid : null, ownerName: t ? t.name : "", actual: act ? act.pts : result === "final" ? 0 : null });
+    }
+    rows.sort((a, c) => c.score - a.score || c.proj - a.proj);
+    const cnt = {};
+    let flex = 0;
+    for (const r of rows) {
+      if (!r.playing) continue;
+      r.posRank = cnt[r.pos] = (cnt[r.pos] || 0) + 1;
+      if (r.pos !== "QB") r.flexRank = ++flex;
+    }
+    // where each player actually finished that week (finished weeks only)
+    if (result === "final") {
+      const fin = {};
+      rows.filter((r) => r.actual !== null).slice().sort((a, c) => c.actual - a.actual).forEach((r) => { r.actualRank = fin[r.pos] = (fin[r.pos] || 0) + 1; });
+    }
+    return { rows, result, form, recentN, histTo };
+  }
+
   /* ---------------- trades ---------------- */
   const DEPTH = [1, 0.85, 0.72, 0.62, 0.55];   // extra pieces count for less: you can only start so many
   const sideValue = (vals) => vals.slice().sort((a, b) => b - a).reduce((s, v, i) => s + v * DEPTH[Math.min(i, DEPTH.length - 1)], 0);
@@ -603,11 +704,26 @@
     const league = { name: opts.dynasty ? "Sample dynasty league" : "Sample league", season: "2026", roster_positions: slots,
       settings: { playoff_week_start: 15, playoff_teams: 7, type: opts.dynasty ? 2 : 0, draft_rounds: 4 },
       scoring_settings: { rec: 1, pass_yd: 0.04, pass_td: 4, rush_yd: 0.1, rush_td: 6, rec_yd: 0.1, rec_td: 6 } };
+    // NFL opponents: rotate the teams each week (teams on bye still get a listed opponent; harmless)
+    const nflOpp = (team, w) => { const order = NFL.slice(w % 32).concat(NFL.slice(0, w % 32)); const i = order.indexOf(team); return order[i % 2 ? i - 1 : i + 1]; };
+    // weekly stats feed: rostered players match their matchup points, everyone else gets a fresh score
+    const statsCache = {};
+    const statsRows = (w) => {
+      if (w > cw) return [];
+      if (statsCache[w]) return statsCache[w];
+      const known = {};
+      for (const row of matchups[w] || []) Object.assign(known, row.players_points);
+      return (statsCache[w] = plist.map((p) => {
+        const v = p.player_id in known ? known[p.player_id] : (w === cw && rnd() < 0.7) || (p.injury_status === "IR" && w > 6) ? 0 : score(p, w);
+        const gp = bye[p.team] === w || (p.injury_status === "IR" && w > 6) || (w === cw && !v) ? 0 : 1;
+        return { player_id: p.player_id, team: p.team, opponent: nflOpp(p.team, w), stats: gp ? { gp, pts_ppr: v } : {} };
+      }));
+    };
     const projRows = (w) => plist.map((p) => {
       let v = bye[p.team] === w ? 0 : p._mu * (0.9 + 0.2 * rnd());
       if (p.injury_status === "IR" || (p.injury_status === "Out" && w === cw)) v = 0;
       const pl = { first_name: p.first_name, last_name: p.last_name, position: p.position, fantasy_positions: p.fantasy_positions, team: p.team, injury_status: p.injury_status };
-      return { player_id: p.player_id, player: pl, team: p.team, stats: { pts_ppr: Math.round(v * 10) / 10 } };
+      return { player_id: p.player_id, player: pl, team: p.team, opponent: bye[p.team] === w ? null : nflOpp(p.team, w), stats: { pts_ppr: Math.round(v * 10) / 10 } };
     });
     const db = Object.fromEntries(plist.map((p) => { const { _mu, ...rest } = p; return [p.player_id, rest]; }));
     return {
@@ -624,6 +740,7 @@
           { season: "2028", round: 1, roster_id: 12, previous_owner_id: 12, owner_id: 2 } ];
         if (/\/drafts$/.test(url)) return [{ season: "2026", status: "complete", settings: { rounds: 4 } }];
         if ((m = /\/projections\/nfl\/2026\/(\d+)/.exec(url))) return projRows(+m[1]);
+        if ((m = /\/stats\/nfl\/2026\/(\d+)/.exec(url))) return statsRows(+m[1]);
         if (/\/v1\/league\/[^/]+$/.test(url)) return league;
         throw new Error("sample: unknown url " + url);
       },
@@ -631,8 +748,8 @@
   }
 
   const api = { API, POSITIONS, SLOT_ACCEPTS, TIERS, liveNet, makeSampleNet, loadLeague, computeValues, bestLineup,
-    lineupStrength, rosterValue, powerRankings, computeDynasty, ageFactor, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
-    settings: { BENCH_CREDIT, BENCH_COUNT, DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
+    lineupStrength, rosterValue, powerRankings, loadWeekRows, weekPoints, weeklyRankings, computeDynasty, ageFactor, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
+    settings: { BENCH_CREDIT, BENCH_COUNT, DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL, WEEKLY_PROJ, RECENT_GAMES } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SleeperCore = api;
 })(typeof self !== "undefined" ? self : this);
