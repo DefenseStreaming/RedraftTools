@@ -78,6 +78,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .chartbox text{font-family:var(--body);fill:var(--muted);font-size:12px}
 .chartbox text.tierlbl{font-family:var(--display);font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;fill:var(--ink)}
 .chartbox text.dl{fill:var(--ink);font-weight:600;font-size:13px}
+.chartbox text.dl tspan.dls{fill:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
 .tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.18);min-width:190px;z-index:3;font-variant-numeric:tabular-nums}
 .tip b{font-size:13px}.tip div{display:flex;gap:6px;align-items:center;justify-content:space-between}.tip div span:first-child{display:flex;gap:6px;align-items:center}
 .tip i{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--context)}
@@ -160,6 +161,22 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   .pg-chart .tip{display:none!important}
 }
 </style>
+<script>
+/* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
+   copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
+(function () {
+  var MINE = "2026-11-27f";
+  try {
+    fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+      if (!v || !v.version || v.version === MINE) return;
+      var u = new URL(location.href);
+      if (u.searchParams.get("v") === v.version) return;          // already tried: don't loop
+      u.searchParams.set("v", v.version);
+      location.replace(u.toString());
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html" aria-current="page">Power Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
@@ -213,7 +230,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
   <div class="body"><div class="range" id="tierDlgRange"></div><p class="desc" id="tierDlgDesc"></p><p class="who" id="tierDlgWho"></p></div>
 </dialog>
-<script src="sleeper-core.js?v=20261127d"></script>
+<script src="sleeper-core.js?v=2026-11-27f"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -344,7 +361,7 @@ function drawChart(forceW, forceH, target) {
   const box = target || $("chartbox"); box.innerHTML = "";
   const { weeks, series, ranks } = H.hist;
   const W = forceW || Math.max(300, box.clientWidth), narrow = W < 640;
-  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 150, r: narrow ? 8 : (forceW ? 132 : 160), t: 12, b: 30 };
+  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 150, r: narrow ? 8 : (forceW ? 160 : 196), t: 12, b: 30 };
   const all = Object.values(series).flat();
   const lo = Math.min(20, Math.floor((Math.min(...all) - 4) / 10) * 10), hi = Math.max(90, Math.ceil((Math.max(...all) + 4) / 10) * 10);
   const x = (i) => m.l + (weeks.length === 1 ? (W - m.l - m.r) / 2 : (i / (weeks.length - 1)) * (W - m.l - m.r));
@@ -400,7 +417,8 @@ function drawChart(forceW, forceH, target) {
     el("circle", { cx: W - m.r + 14, cy: L.y, r: 4.5, fill: L.c }, lg);
     const tx = el("text", { x: W - m.r + 24, y: L.y + 4, class: "dl" }, lg);
     const maxc = forceW ? 16 : 20;
-    tx.textContent = t.name.length > maxc ? t.name.slice(0, maxc - 1) + "…" : t.name;
+    const nm = el("tspan", {}, tx); nm.textContent = t.name.length > maxc ? t.name.slice(0, maxc - 1) + "…" : t.name;
+    const sc = el("tspan", { class: "dls", dx: 5 }, tx); sc.textContent = last(series[L.rid]).toFixed(1);   // this week's score
   }
   // hover: crosshair + tooltip with every team that week
   const cross = el("line", { y1: m.t, y2: Ht - m.b, stroke: "var(--ink)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 }, svg);
