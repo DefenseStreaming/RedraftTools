@@ -98,6 +98,43 @@ dialog#tierDlg::backdrop{background:rgba(0,0,0,.45)}
 #tierDlg .who{margin:0;color:var(--muted);font-size:14px}
 details{margin-top:12px}summary{cursor:pointer;font-weight:600;font-size:14px;min-height:32px}
 td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:2px 8px;border-radius:99px}
+
+/* ---------- export / print ---------- */
+.printhead,.printfoot{display:none}
+.exportbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px}
+.exportbar button{font-weight:600}
+@media print{
+  @page{size:letter;margin:.45in}
+  :root:root:root{--bg:#fff;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#4f6370;--line:#cfd8de;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;color-scheme:light}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-shadow:none!important}
+  body{background:#fff;font-size:10.5pt}
+  .wrap{max-width:none;padding:0;gap:10px}
+  .sitenav,.wrap>header,section[aria-label="Settings"],#status,.explain,.noprint,.exportbar{display:none!important}
+  .printhead{display:flex!important;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:3px solid var(--accent);padding-bottom:6px;margin-bottom:4px}
+  .printhead h1{font-size:30px}.printhead .ph-sub{font-size:13px;color:var(--muted);text-align:right}
+  .printfoot{display:block!important;font-size:9pt;color:var(--muted);text-align:center;margin-top:8px}
+  .panel{border:1px solid var(--line);padding:10px}
+  .scroll{overflow:visible!important}
+  table{width:100%;table-layout:auto}
+  th{font-size:8pt;white-space:normal;padding:4px 5px;vertical-align:bottom}
+  td{padding:4px 5px;font-size:9.5pt}td.tm{white-space:normal}td.last{font-size:16pt}
+}
+@media print{
+  .meta{display:none}
+  .tiles{grid-template-columns:repeat(3,1fr);grid-auto-rows:2.16in;gap:8px}
+  .tile{position:relative}.tile .sc{position:absolute;right:12px;bottom:46px;margin:0}
+  .tile{break-inside:avoid}.tile .rk{font-size:42px}.tile .nm{font-size:21px;overflow-wrap:normal;word-break:normal}.tile .sc b{font-size:28px}
+  .tile .sub2{font-size:12px}.tile .top{padding:10px 12px 6px}.tier{font-size:15px;padding:8px 12px;white-space:nowrap;overflow:hidden}
+  button.tier::after{display:none}
+  .legend{margin-top:8px;gap:5px;flex-wrap:nowrap}.legend button{font-size:9px;padding:2px 7px;min-height:0;white-space:nowrap}
+  #history{break-before:page}
+  .picks,#history details,#histLede{display:none!important}
+  .chartbox text.tierlbl{text-decoration:none}
+  #tbl{break-inside:auto}#tbl tr{break-inside:avoid}
+  #tbl td{padding:3px 5px;font-size:9pt}#tbl td.tm{white-space:nowrap}#tbl td.last{font-size:13pt}
+  #tbl td button.pill{font-size:8pt;padding:1px 6px;min-height:0}
+  .scroll{margin-top:8px}#history{padding:8px 10px}#history h2{font-size:20px}
+}
 </style>
 </head>
 <body>
@@ -119,6 +156,8 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   </section>
   <section id="status" aria-live="polite"></section>
   <section id="results" hidden aria-label="Rankings">
+    <div class="printhead"><h1 id="phLeague"></h1><div class="ph-sub"><b>Power Rankings</b><br><span id="phSub"></span></div></div>
+    <div class="exportbar"><button type="button" id="exportPdf">Export PDF</button></div>
     <p class="meta" id="meta"></p>
     <div class="tiles" id="tiles"></div>
     <div class="legend" id="legend"></div>
@@ -131,6 +170,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
     </section>
     <div class="panel scroll"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
   </section>
+  <p class="printfoot">Score = 50% record, 30% points for, 20% roster strength, each as a z-score scaled to 0–100 (50 = league average). Made with Sleeper Tools.</p>
   <section class="panel explain">
     <div><b>How the score works.</b> Each team gets three numbers: win percentage, total points scored, and roster strength. Each one is turned into a z-score (how far above or below the league average, in standard deviations). The z-scores are weighted 50% record, 30% points and 20% roster, then scaled to a 0–100 score where 50 is average: score = (weighted z + 2.5) ÷ 5 × 100.</div>
     <div><b>Roster strength</b> is the best legal starting lineup each team can field, averaged over the next four weeks, using your league's scoring. Each player's weekly number is 50% his points per game so far and 50% Sleeper's projected points per game. A player on bye that week, or projected out, counts as zero, Questionable players count 78% for the coming game and Doubtful 10%. Empty spots are filled at waiver-wire level.</div>
@@ -168,7 +208,12 @@ function moveHtml(m) {
   if (m < 0) return `<span class="mv down" title="Down ${-m} from last week">▼ ${-m}</span>`;
   return `<span class="mv" title="No change from last week">–</span>`;
 }
+let pdfTitle = "Power Rankings";
 function render(b, rows, sample) {
+  const lname = b.league.name || "Your league";
+  pdfTitle = `${lname} Week ${b.gp} Power Rankings`;
+  $("phLeague").textContent = lname;
+  $("phSub").textContent = `Week ${b.gp} · ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
   $("meta").innerHTML = `<b>${esc(b.league.name || "Your league")}</b> · standings through week ${b.gp} · roster strength looks at weeks ${b.remaining.slice(0, 4).join(", ") || "none left (points per game used)"}`;
   $("tiles").innerHTML = rows.map((r) => `<article class="tile">
     <div class="top"><div><div class="rk">${r.rank}</div>${moveHtml(r.move)}</div>
@@ -237,11 +282,11 @@ $("picks").addEventListener("click", (e) => {
   drawPicks(); drawChart();
 });
 function el(tag, attrs, parent) { const n = document.createElementNS(SVGNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
-function drawChart() {
+function drawChart(forceW, forceH) {
   const box = $("chartbox"); box.innerHTML = "";
   const { weeks, series, ranks } = H.hist;
-  const W = Math.max(300, box.clientWidth), narrow = W < 640;
-  const Ht = narrow ? 340 : 440, m = { l: narrow ? 30 : 190, r: narrow ? 8 : 170, t: 12, b: 30 };
+  const W = forceW || Math.max(300, box.clientWidth), narrow = W < 640;
+  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 215, r: narrow ? 8 : 170, t: 12, b: 30 };
   const all = Object.values(series).flat();
   const lo = Math.min(20, Math.floor((Math.min(...all) - 4) / 10) * 10), hi = Math.max(90, Math.ceil((Math.max(...all) + 4) / 10) * 10);
   const x = (i) => m.l + (weeks.length === 1 ? (W - m.l - m.r) / 2 : (i / (weeks.length - 1)) * (W - m.l - m.r));
@@ -307,7 +352,22 @@ function drawChart() {
   hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show);
   hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("opacity", 0); });
 }
-window.addEventListener("resize", () => { if (H && !$("history").hidden) drawChart(); });
+window.addEventListener("resize", () => { if (H && !$("history").hidden && !printing) drawChart(); });
+/* ---------- export to PDF (the browser's print dialog -> Save as PDF) ---------- */
+let printing = false, oldTitle = document.title;
+function beforePrint() {
+  if (printing) return; printing = true;
+  oldTitle = document.title; document.title = pdfTitle;           // becomes the PDF file name
+  if (H && !$("history").hidden) drawChart(1000, 520);            // full chart layout at page width
+}
+function afterPrint() {
+  if (!printing) return; printing = false;
+  document.title = oldTitle;
+  if (H && !$("history").hidden) drawChart();
+}
+window.addEventListener("beforeprint", beforePrint);
+window.addEventListener("afterprint", afterPrint);
+$("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); setTimeout(afterPrint, 1000); });
 
 async function go(sample) {
   const id = $("leagueId").value.trim();

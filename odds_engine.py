@@ -1202,6 +1202,8 @@ def run_league(args, quiet=False):
     league, nfl_state, teams = load_league(args.league_id, parse_renames(args.rename))
     start_week, end_week, floor, settings = plan(args, league, teams)
     season = league.get("season")
+    args._league_name = league.get("name") or "Your league"
+    args._floor = floor
     if settings.get("league_average_match"):
         say("WARNING: this league scores a win vs the weekly median; those extra games are not modelled.")
     pt = settings.get("playoff_teams")
@@ -2030,6 +2032,8 @@ def run_web(league_id, simulations=5000, questionable_prob=0.78, record_seeds=6,
                        "rule": rule, "byes": bys, "spots": min(len(rule), len(results)),
                        "injuries": getattr(args, "_injuries", []), "week": getattr(args, "_first_week", None),
                        "live": getattr(args, "_live", False),
+                       "league_name": getattr(args, "_league_name", "Your league"),
+                       "weeks_played": getattr(args, "_floor", None),
                        "injuries_modelled": not args.no_injuries and getattr(args, "_have_lineups", False)})
 
 
