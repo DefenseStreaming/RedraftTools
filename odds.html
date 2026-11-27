@@ -115,7 +115,7 @@ td.out{white-space:normal;min-width:220px}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27f";
+  var MINE = "2026-11-27g";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
