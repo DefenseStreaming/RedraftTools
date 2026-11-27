@@ -170,7 +170,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27j";
+  var MINE = "2026-11-27k";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -235,7 +235,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
   <div class="body"><div class="range" id="tierDlgRange"></div><p class="desc" id="tierDlgDesc"></p><p class="who" id="tierDlgWho"></p></div>
 </dialog>
-<script src="sleeper-core.js?v=2026-11-27j"></script>
+<script src="sleeper-core.js?v=2026-11-27k"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -472,5 +472,6 @@ $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
 $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
 </script>
+<script src="leagues.js?v=2026-11-27k"></script>
 </body>
 </html>

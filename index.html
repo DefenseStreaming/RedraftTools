@@ -17,12 +17,23 @@ a.card:hover{border-color:var(--accent)}a.card:focus-visible{outline:3px solid v
 .tag{align-self:flex-start;font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;background:var(--accent);color:var(--accent-ink)}
 .tag.soon{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .card.off{opacity:.75}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.panel h2{font-family:var(--display);font-size:30px;margin:0}.panel p{margin:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.row .grow{flex:1 1 220px}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.6;cursor:progress}:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px}.msg{font-size:14px;border-radius:8px;padding:8px 12px}.msg.err{background:#fde4e1;color:#7a1d12}.msg.ok{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .msg.err{background:#3d1a16;color:#f5b3aa}}
+:root[data-theme="dark"] .msg.err{background:#3d1a16;color:#f5b3aa}
 footer{color:var(--muted);font-size:13px}
 </style><script>
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27j";
+  var MINE = "2026-11-27k";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -36,12 +47,53 @@ footer{color:var(--muted);font-size:13px}
 </script>
 </head><body><div class="wrap">
 <header><h1>Sleeper Tools</h1><p class="lede">Fantasy football tools that use your own league's scoring and settings. Enter a Sleeper league ID and go.</p></header>
+<section class="panel" aria-label="Your Sleeper leagues">
+<h2>Your leagues</h2>
+<p class="hint">Enter your Sleeper username to load all your leagues. Pick a default and every tool opens with it. On each page you can switch to any of your leagues or still type a league ID by hand.</p>
+<div class="row"><div class="grow"><label class="f" for="username">Sleeper username</label><input id="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="e.g. your_sleeper_name"></div>
+<button id="findLeagues" class="primary" type="button">Load my leagues</button></div>
+<div id="acctMsg" aria-live="polite"></div>
+<div id="defBox" hidden><label class="f" for="defLeague">Default league for every page</label><select id="defLeague"></select>
+<div class="row" style="margin-top:10px"><button id="forget" type="button">Forget my leagues</button></div></div>
+</section>
 <section class="cards" aria-label="Tools">
 <a class="card" href="defense.html"><span class="tag">Live</span><h2>Defense Streamer</h2><p>Ranks every defense for the next three weeks using your league's defense scoring.</p></a>
-<a class="card" href="power.html"><span class="tag">Live</span><h2>Power Rankings</h2><p>Record 50%, points for 30% and roster strength 20%, with tiers and weekly movement.</p></a>
-<a class="card" href="weekly.html"><span class="tag">New</span><h2>Weekly Rankings</h2><p>QB, RB, WR, TE and FLEX rankings for any week: 75% projection, 25% form, with every player's owner.</p></a>
+<a class="card" href="power.html"><span class="tag">Live</span><h2>Power Rankings</h2><p>Ranks League based on Record, Points For, and Roster Strength</p></a>
+<a class="card" href="weekly.html"><span class="tag">New</span><h2>Weekly Rankings</h2><p>QB, RB , WR, TE and Flex rankings based on your league settings and season averages</p></a>
 <a class="card" href="trade.html"><span class="tag">Live</span><h2>Trade Calculator</h2><p>Pick two teams and build a trade. A live bar shows if it's even, lopsided or a fleecing.</p></a>
 <a class="card" href="odds.html"><span class="tag">Live</span><h2>Playoff Odds</h2><p>Full simulation with lineups, injuries and byes. Enter your league ID and press Run.</p></a>
 </section>
 <footer>Not affiliated with Sleeper or the NFL. Data comes from Sleeper's public feeds.</footer>
-</div></body></html>
+</div>
+<script src="leagues.js?v=2026-11-27k"></script>
+<script>
+(function () {
+  const L = window.SleeperLeagues, $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const msg = (kind, text) => { $("acctMsg").innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; };
+  function draw() {
+    const user = L.getUser(), leagues = L.getLeagues(), def = L.getDefault();
+    if (user) $("username").value = user.username;
+    $("defBox").hidden = !leagues.length;
+    $("defLeague").innerHTML = leagues.map((l) => `<option value="${esc(l.id)}"${l.id === def ? " selected" : ""}>${esc(L.label(l))}</option>`).join("");
+  }
+  async function find() {
+    $("findLeagues").disabled = true; msg("ok", "Looking up your leagues…");
+    try {
+      const res = await L.fetchUserLeagues($("username").value);
+      if (!res.leagues.length) { msg("err", `${res.user.name} has no NFL leagues for ${res.season}.`); return; }
+      L.save(res); draw();
+      msg("ok", `Loaded ${res.leagues.length} league${res.leagues.length === 1 ? "" : "s"} for ${res.user.name} (${res.season} season).`);
+    } catch (e) {
+      const m = String(e && e.message || e);
+      msg("err", /fetch|network|load failed/i.test(m) ? "Could not reach Sleeper. Check your connection and try again." : m);
+    } finally { $("findLeagues").disabled = false; }
+  }
+  $("findLeagues").addEventListener("click", find);
+  $("username").addEventListener("keydown", (e) => { if (e.key === "Enter") find(); });
+  $("defLeague").addEventListener("change", () => { L.setDefault($("defLeague").value); msg("ok", "Default league saved. Every tool will open with it."); });
+  $("forget").addEventListener("click", () => { L.clear(); $("username").value = ""; draw(); msg("ok", "Your leagues were removed from this browser."); });
+  draw();
+})();
+</script>
+</body></html>

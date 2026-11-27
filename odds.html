@@ -128,7 +128,7 @@ td.out{white-space:normal;min-width:220px}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27j";
+  var MINE = "2026-11-27k";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -376,5 +376,6 @@ $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(fal
   <section class="pg-flow" id="pdfInjPage"><div class="pg-head"><div class="pg-title">Key injuries</div><div class="pg-sub"><b id="pdfLeague2"></b><br><span id="pdfWhen2"></span></div></div>
     <table class="injall" id="pdfInjAll"></table><p class="pg-note" id="pdfInjNote"></p></section>
 </div>
+<script src="leagues.js?v=2026-11-27k"></script>
 </body>
 </html>
