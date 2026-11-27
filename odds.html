@@ -65,6 +65,33 @@ h2{font-family:var(--display);font-size:26px;line-height:1.1;margin:0 0 4px}
 td.out{white-space:normal;min-width:220px}
 .explain ul{margin:2px 0 0;padding-left:20px}
 .explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+
+/* ---------- export / print ---------- */
+.printhead,.printfoot{display:none}
+.exportbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px}
+.exportbar button{font-weight:600}
+@media print{
+  @page{size:letter;margin:.45in}
+  :root:root:root{--bg:#fff;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#4f6370;--line:#cfd8de;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;color-scheme:light}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-shadow:none!important}
+  body{background:#fff;font-size:10.5pt}
+  .wrap{max-width:none;padding:0;gap:10px}
+  .sitenav,.wrap>header,section[aria-label="Settings"],#status,.explain,.noprint,.exportbar{display:none!important}
+  .printhead{display:flex!important;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:3px solid var(--accent);padding-bottom:6px;margin-bottom:4px}
+  .printhead h1{font-size:30px}.printhead .ph-sub{font-size:13px;color:var(--muted);text-align:right}
+  .printfoot{display:block!important;font-size:9pt;color:var(--muted);text-align:center;margin-top:8px}
+  .panel{border:1px solid var(--line);padding:10px}
+  .scroll{overflow:visible!important}
+  table{width:100%;table-layout:auto}
+  th{font-size:8pt;white-space:normal;padding:4px 5px;vertical-align:bottom}
+  td{padding:4px 5px;font-size:9.5pt}td.tm{white-space:normal}td.last{font-size:16pt}
+}
+@media print{
+  #results{break-inside:auto}#results tr{break-inside:avoid}
+  #injuries{break-inside:avoid}
+  .check{font-size:9pt}
+  tr.in td{background:color-mix(in srgb,var(--accent-soft) 70%,transparent)}
+}
 </style>
 </head>
 <body>
@@ -90,8 +117,9 @@ td.out{white-space:normal;min-width:220px}
     <p class="hint">The first run downloads the Python engine and Sleeper's player list, so it can take 30 seconds or more. Later runs in the same visit are faster. No Sleeper league? Try the <a href="quick.html">quick calculator</a>.</p>
   </section>
   <section id="status" aria-live="polite"></section>
+  <div class="printhead" id="oddsHead" hidden><h1 id="phLeague"></h1><div class="ph-sub"><b>Playoff Odds</b><br><span id="phSub"></span></div></div>
   <section class="panel" id="results" hidden aria-label="Results">
-    <div class="restools"><label class="toggle"><input type="checkbox" id="eachSeed"> Show odds for every seed</label></div>
+    <div class="restools noprint"><button type="button" id="exportPdf" style="margin-right:auto;font-weight:600">Export PDF</button><label class="toggle"><input type="checkbox" id="eachSeed"> Show odds for every seed</label></div>
     <div class="scroll"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
     <p class="check" id="check"></p>
   </section>
@@ -100,6 +128,7 @@ td.out{white-space:normal;min-width:220px}
     <p class="lede" id="injLede"></p>
     <div class="scroll"><table id="injTable"><thead><tr><th>Player</th><th>Team</th><th>Status</th><th>Outlook in the sim</th><th>Proj pts/wk</th><th>Lineup hit</th></tr></thead><tbody id="injBody"></tbody></table></div>
   </section>
+  <p class="printfoot" id="oddsFoot"></p>
   <section class="panel explain">
     <div><b>How it works.</b> Each team's strength comes from its roster and its scoring history. Every simulated season plays out the remaining schedule with random weekly scores, sets each team's best lineup, applies injuries and bye weeks, then seeds the teams. The odds are the share of simulated seasons where a team gets in.</div>
     <div><b>Columns.</b> Avg Seed is the team's average seed in the simulated seasons where it gets in. Bye Odds is the chance of landing on any seed you marked for a bye. Record Spot and Points Spot split the playoff odds by how the team got in (shown when you mix both). Playoff Odds is the total chance of getting in.</div>
@@ -204,9 +233,16 @@ function finish(r) {
   drawInjuries(r);
   status(wasDemo ? "sample" : "", wasDemo ? "Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real odds." : "");
 }
+let pdfTitle = "Playoff Odds";
 function drawResults() {
   if (!lastRun) return;
   const r = lastRun.r, res = r.results, spots = r.spots, byes = r.byes;
+  const lname = r.league_name || "Your league", wk = r.weeks_played != null ? r.weeks_played : (r.week ? r.week - 1 : "");
+  pdfTitle = `${lname} Week ${wk} Playoff Odds`;
+  $("phLeague").textContent = lname;
+  $("phSub").textContent = `Week ${wk} · ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
+  $("oddsFoot").textContent = `${spots} playoff spots (seeds ${[...r.rule.slice(0, spots)].map((m, k) => `${k + 1} ${m === "P" ? "by points" : "by record"}`).join(", ")})`
+    + (byes.length ? `; byes for seed ${byes.join(", ")}` : "") + `. ${r.sims.toLocaleString()} simulated seasons with lineups, injuries and bye weeks. Made with Sleeper Tools.`;
   const mixed = r.rule.includes("R") && r.rule.includes("P"), each = $("eachSeed").checked;
   const cols = [["Rank", (x, i) => i + 1], ["Team", (x) => x.team],
     ["Avg Seed", (x) => x.avg_seed == null ? "--" : x.avg_seed.toFixed(1)],];
@@ -225,6 +261,12 @@ function drawResults() {
   $("results").hidden = false;
 }
 $("eachSeed").addEventListener("change", drawResults);
+let printing = false, oldTitle = document.title;
+function beforePrint() { if (printing) return; printing = true; oldTitle = document.title; document.title = pdfTitle; }
+function afterPrint() { if (!printing) return; printing = false; document.title = oldTitle; }
+window.addEventListener("beforeprint", beforePrint);
+window.addEventListener("afterprint", afterPrint);
+$("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); setTimeout(afterPrint, 1000); });
 function drawInjuries(r) {
   const list = r.injuries || [];
   $("injuries").hidden = false;
