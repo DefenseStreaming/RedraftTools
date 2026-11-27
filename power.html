@@ -192,12 +192,12 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
       <div class="chartbox" id="chartbox"></div>
       <details><summary>Show as a table</summary><div class="scroll" style="margin-top:6px"><table id="histTable"></table></div></details>
     </section>
-    <div class="panel scroll" id="tblPanel"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
+    <div class="panel scroll" id="tblPanel"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th title="Trade value of the best starting lineup, plus 15% of the top six bench players">Roster value</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
   </section>
   <p class="printfoot">Score = 50% record, 30% points for, 20% roster strength, each as a z-score scaled to 0–100 (50 = league average). Made with Sleeper Tools.</p>
   <section class="panel explain">
     <div><b>How the score works.</b> Each team gets three numbers: win percentage, total points scored, and roster strength. Each one is turned into a z-score (how far above or below the league average, in standard deviations). The z-scores are weighted 50% record, 30% points and 20% roster, then scaled to a 0–100 score where 50 is average: score = (weighted z + 2.5) ÷ 5 × 100.</div>
-    <div><b>Roster strength</b> is the best legal starting lineup each team can field, averaged over the next four weeks, using your league's scoring. Each player's weekly number is 50% his points per game so far and 50% Sleeper's projected points per game. A player on bye that week, or projected out, counts as zero, Questionable players count 78% for the coming game and Doubtful 10%. Empty spots are filled at waiver-wire level.</div>
+    <div><b>Roster strength</b> uses the same player values as the Trade Calculator: rest-of-season value from what each player has done and is projected to do (half each), with a small bye penalty, counting only what he adds over the best free agents. A team's roster value is the total value of its best legal starting lineup, plus 15% of the value of its top six bench players for depth. Stars count extra, because values follow the same curve as the trade calculator.</div>
     <div><b>Tiers.</b> Tap any tier banner, legend chip or tier name on the chart to see what it means and who's in it.</div>
     <div><b>Movement</b> compares with last week's rankings, rebuilt from last week's record and points with the same roster score.</div>
     <div><b>Score by week</b> rebuilds every past week from that week's record and points for, plus the roster the team actually had that week (from Sleeper's weekly lineups). Those rosters are rated by what each player has done and is projected to do this season. The last point is this week's score.</div>
@@ -206,14 +206,14 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
 <div id="pdfDoc" aria-hidden="true">
   <section class="pg"><div class="pg-head"><div class="pg-title pdf-league"></div><div class="pg-sub"><b>Power Rankings</b><br><span class="pdf-when"></span></div></div><div class="pg-tiles" id="pdfTiles"></div></section>
   <section class="pg"><div class="pg-head"><div class="pg-title">Tier guide</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-tiers" id="pdfTiers"></div>
-    <p class="pg-note"><b>How the score works:</b> 50% record, 30% points for and 20% roster strength. Each is a z-score against the league average, weighted, then scaled so 50 is average: (weighted z + 2.5) ÷ 5 × 100. Roster strength is the best starting lineup each team can field over the next four weeks. Made with Sleeper Tools.</p></section>
+    <p class="pg-note"><b>How the score works:</b> 50% record, 30% points for and 20% roster strength. Each is a z-score against the league average, weighted, then scaled so 50 is average: (weighted z + 2.5) ÷ 5 × 100. Roster strength is the trade value of each team's best starting lineup plus 15% of its top six bench players (the same player values as the Trade Calculator). Made with Sleeper Tools.</p></section>
   <section class="pg"><div class="pg-head"><div class="pg-title">Score by week</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-chart viz chartbox" id="pdfChart"></div></section>
 </div>
 <dialog id="tierDlg" aria-labelledby="tierDlgTitle">
   <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
   <div class="body"><div class="range" id="tierDlgRange"></div><p class="desc" id="tierDlgDesc"></p><p class="who" id="tierDlgWho"></p></div>
 </dialog>
-<script src="sleeper-core.js?v=20261127c"></script>
+<script src="sleeper-core.js?v=20261127d"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -245,7 +245,7 @@ function render(b, rows, sample) {
   document.title = pdfTitle;          // stays set: iPhone's print sheet reads it later, as the PDF name
   $("phLeague").textContent = lname;
   $("phSub").textContent = `Week ${b.gp} · ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
-  $("meta").innerHTML = `<b>${esc(b.league.name || "Your league")}</b> · standings through week ${b.gp} · roster strength looks at weeks ${b.remaining.slice(0, 4).join(", ") || "none left (points per game used)"}`;
+  $("meta").innerHTML = `<b>${esc(b.league.name || "Your league")}</b> · standings through week ${b.gp} · roster value uses rest-of-season player values (same as the Trade Calculator)`;
   $("tiles").innerHTML = rows.map((r) => `<article class="tile">
     <div class="top"><div><div class="rk">${r.rank}</div>${moveHtml(r.move)}</div>
       <div style="min-width:0"><div class="nm">${esc(r.name)}</div><div class="sub2">${rec(r)} · ${r.pf.toFixed(1)} PF</div></div>
