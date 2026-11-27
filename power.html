@@ -119,21 +119,35 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   th{font-size:8pt;white-space:normal;padding:4px 5px;vertical-align:bottom}
   td{padding:4px 5px;font-size:9.5pt}td.tm{white-space:normal}td.last{font-size:16pt}
 }
+.ptiers{display:none}
 @media print{
-  .meta{display:none}
-  .tiles{grid-template-columns:repeat(3,1fr);grid-auto-rows:2.16in;gap:8px}
-  .tile{position:relative}.tile .sc{position:absolute;right:12px;bottom:46px;margin:0}
-  .tile{break-inside:avoid}.tile .rk{font-size:42px}.tile .nm{font-size:21px;overflow-wrap:normal;word-break:normal}.tile .sc b{font-size:28px}
-  .tile .sub2{font-size:12px}.tile .top{padding:10px 12px 6px}.tier{font-size:15px;padding:8px 12px;white-space:nowrap;overflow:hidden}
+  .meta,.legend,#tblPanel,.printfoot{display:none!important}
+  /* page 1: tiles, tier banner on top, one full page */
+  .tiles{grid-template-columns:repeat(3,1fr);grid-auto-rows:2.27in;gap:8px}
+  .tile{position:relative;break-inside:avoid}
+  .tile .tier{order:-1;margin-top:0;font-size:15px;padding:8px 12px;white-space:nowrap;overflow:hidden}
+  .tile .top{flex:1;padding:10px 12px 6px}
+  .tile .sc{position:absolute;right:12px;bottom:10px;margin:0}
+  .tile .rk{font-size:44px}.tile .nm{font-size:22px;overflow-wrap:normal;word-break:normal}.tile .sc b{font-size:30px}.tile .sub2{font-size:12px}
   button.tier::after{display:none}
-  .legend{margin-top:8px;gap:5px;flex-wrap:nowrap}.legend button{font-size:9px;padding:2px 7px;min-height:0;white-space:nowrap}
-  #history{break-before:page}
+  /* page 2: tier guide */
+  .ptiers{display:flex!important;flex-direction:column;gap:8px;break-before:page;height:9.95in}
+  .ptiers h2{font-family:var(--display);font-size:28px;margin:0;border-bottom:3px solid var(--accent);padding-bottom:4px}
+  .ptier{flex:1;display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;break-inside:avoid}
+  .ptier .pt-band{flex:none;width:2.1in;color:#fff;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+  .ptier .pt-band b{font-family:var(--display);font-size:22px;line-height:1.05;text-transform:uppercase}
+  .ptier .pt-band span{font-size:12px;opacity:.9}
+  .ptier .pt-body{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+  .ptier .pt-body p{margin:0;font-size:11.5pt}
+  .ptier .pt-teams{color:var(--muted);font-size:10pt}
+  .ptiers .pt-note{font-size:9.5pt;color:var(--muted);margin:2px 0 0}
+  /* page 3: history graph, full page */
+  #history{break-before:page;padding:8px 10px;break-inside:avoid}
+  #history h2{font-size:28px;border-bottom:3px solid var(--accent);padding-bottom:4px;margin-bottom:6px}
+  #chartbox svg{width:100%!important;height:8.85in!important}
+  #chartbox .tip{display:none!important}
   .picks,#history details,#histLede{display:none!important}
   .chartbox text.tierlbl{text-decoration:none}
-  #tbl{break-inside:auto}#tbl tr{break-inside:avoid}
-  #tbl td{padding:3px 5px;font-size:9pt}#tbl td.tm{white-space:nowrap}#tbl td.last{font-size:13pt}
-  #tbl td button.pill{font-size:8pt;padding:1px 6px;min-height:0}
-  .scroll{margin-top:8px}#history{padding:8px 10px}#history h2{font-size:20px}
 }
 </style>
 </head>
@@ -161,6 +175,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
     <p class="meta" id="meta"></p>
     <div class="tiles" id="tiles"></div>
     <div class="legend" id="legend"></div>
+    <section class="ptiers" id="ptiers" aria-hidden="true"></section>
     <section class="panel viz" id="history" style="margin-top:16px" aria-label="Score history">
       <h2>Score by week</h2>
       <p class="lede" id="histLede">Each line is a team's power score after every week. Pick up to three teams to highlight, hover a week to see everyone, and tap a tier name to see what it means.</p>
@@ -168,7 +183,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
       <div class="chartbox" id="chartbox"></div>
       <details><summary>Show as a table</summary><div class="scroll" style="margin-top:6px"><table id="histTable"></table></div></details>
     </section>
-    <div class="panel scroll"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
+    <div class="panel scroll" id="tblPanel"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
   </section>
   <p class="printfoot">Score = 50% record, 30% points for, 20% roster strength, each as a z-score scaled to 0–100 (50 = league average). Made with Sleeper Tools.</p>
   <section class="panel explain">
@@ -225,6 +240,7 @@ function render(b, rows, sample) {
     <td>${rec(r)}</td><td>${r.pf.toFixed(1)}</td><td>${r.roster.toFixed(1)}</td><td>${z(r.zWin)}</td><td>${z(r.zPf)}</td><td>${z(r.zRoster)}</td><td class="last">${r.score.toFixed(1)}</td></tr>`).join("");
   $("results").hidden = false;
   drawHistory(b, rows);
+  drawPrintTiers(rows);
   const notes = b.notes.slice();
   if (sample) notes.unshift("Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real rankings.");
   if (!b.gp) notes.push("No games have been played yet, so every team's record and points are even.");
@@ -237,6 +253,14 @@ const last = (a) => a[a.length - 1];
 const SVGNS = "http://www.w3.org/2000/svg";
 const tierRanges = () => { const t = SleeperCore.TIERS; return t.map(([lo, n], i) => ({ name: n, lo, hi: i ? t[i - 1][0] : Infinity })); };
 let lastRows = [];
+function drawPrintTiers(rows) {
+  $("ptiers").innerHTML = `<h2>Tier guide</h2>` + tierRanges().map((t) => {
+    const who = rows.filter((r) => r.tier === t.name).map((r) => `${r.rank}. ${esc(r.name)} (${r.score.toFixed(1)})`);
+    const range = t.lo === -Infinity ? "Score below 30" : t.hi === Infinity ? `Score ${t.lo}+` : `Score ${t.lo}–${(t.hi - 0.1).toFixed(1)}`;
+    return `<div class="ptier"><div class="pt-band" style="background:${TIER_COLOR[t.name]}"><b>${esc(t.name)}</b><span>${range}</span></div>
+      <div class="pt-body"><p>${esc(TIER_TEXT[t.name])}</p><div class="pt-teams">${who.length ? "This week: " + who.join(" · ") : "Nobody this week."}</div></div></div>`;
+  }).join("") + `<p class="pt-note"><b>How the score works:</b> 50% record, 30% points for and 20% roster strength. Each is a z-score against the league average, weighted, then scaled so 50 is average: (weighted z + 2.5) ÷ 5 × 100. Roster strength is the best starting lineup each team can field over the next four weeks. Made with Sleeper Tools.</p>`;
+}
 function openTier(name) {
   const t = tierRanges().find((x) => x.name === name);
   if (!t) return;
@@ -286,7 +310,7 @@ function drawChart(forceW, forceH) {
   const box = $("chartbox"); box.innerHTML = "";
   const { weeks, series, ranks } = H.hist;
   const W = forceW || Math.max(300, box.clientWidth), narrow = W < 640;
-  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 215, r: narrow ? 8 : 170, t: 12, b: 30 };
+  const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 150, r: narrow ? 8 : (forceW ? 132 : 160), t: 12, b: 30 };
   const all = Object.values(series).flat();
   const lo = Math.min(20, Math.floor((Math.min(...all) - 4) / 10) * 10), hi = Math.max(90, Math.ceil((Math.max(...all) + 4) / 10) * 10);
   const x = (i) => m.l + (weeks.length === 1 ? (W - m.l - m.r) / 2 : (i / (weeks.length - 1)) * (W - m.l - m.r));
@@ -300,8 +324,15 @@ function drawChart(forceW, forceH) {
     if (!narrow) {                                   // tier name beside its band, in text ink
       const mid = (y(top) + y(bot)) / 2;
       el("rect", { x: m.l - 30, y: mid - 6, width: 4, height: 12, rx: 1, fill: TIER_COLOR[t.name] }, svg);
-      const lbl = el("text", { x: m.l - 36, y: mid + 4, class: "tierlbl", "text-anchor": "end", "data-tier": t.name, role: "button", tabindex: 0 }, svg);
-      lbl.textContent = t.name;
+      const words = t.name.split(" "), lines = [];
+      if (t.name.length > 12 && words.length > 1) {                 // long names on two lines
+        let best = 1, diff = Infinity;
+        for (let k = 1; k < words.length; k++) { const d = Math.abs(words.slice(0, k).join(" ").length - words.slice(k).join(" ").length); if (d < diff) { diff = d; best = k; } }
+        lines.push(words.slice(0, best).join(" "), words.slice(best).join(" "));
+      } else lines.push(t.name);
+      const lbl = el("text", { x: m.l - 36, y: mid + 4 - (lines.length - 1) * 7, class: "tierlbl", "text-anchor": "end", "data-tier": t.name, role: "button", tabindex: 0 }, svg);
+      lines.forEach((ln, k) => { const ts = el("tspan", { x: m.l - 36, dy: k ? 15 : 0 }, lbl); ts.textContent = ln; });
+      el("title", {}, lbl).textContent = t.name;
     }
     if (bot > lo) { el("line", { x1: m.l, x2: W - m.r, y1: y(bot), y2: y(bot), stroke: "var(--line)", "stroke-width": 1 }, svg);
       const tk = el("text", { x: m.l - 6, y: y(bot) + 4, "text-anchor": "end" }, svg); tk.textContent = bot; }
@@ -331,7 +362,8 @@ function drawChart(forceW, forceH) {
     const t = H.teams.find((q) => q.rid === L.rid);
     el("circle", { cx: W - m.r + 14, cy: L.y, r: 5, fill: L.c }, svg);
     const tx = el("text", { x: W - m.r + 24, y: L.y + 4, class: "dl" }, svg);
-    tx.textContent = t.name.length > 20 ? t.name.slice(0, 19) + "…" : t.name;
+    const maxc = forceW ? 16 : 20;
+    tx.textContent = t.name.length > maxc ? t.name.slice(0, maxc - 1) + "…" : t.name;
   }
   // hover: crosshair + tooltip with every team that week
   const cross = el("line", { y1: m.t, y2: Ht - m.b, stroke: "var(--ink)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 }, svg);
@@ -358,7 +390,7 @@ let printing = false, oldTitle = document.title;
 function beforePrint() {
   if (printing) return; printing = true;
   oldTitle = document.title; document.title = pdfTitle;           // becomes the PDF file name
-  if (H && !$("history").hidden) drawChart(1000, 520);            // full chart layout at page width
+  if (H && !$("history").hidden) drawChart(760, 910);            // full chart layout at page width
 }
 function afterPrint() {
   if (!printing) return; printing = false;
