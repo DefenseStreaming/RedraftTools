@@ -55,6 +55,15 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .seedhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
 .seedhead b{font-weight:600;font-size:14px}
 .restools{display:flex;justify-content:flex-end;margin-bottom:6px}
+h2{font-family:var(--display);font-size:26px;line-height:1.1;margin:0 0 4px}
+.panel .lede{color:var(--muted);font-size:14px;margin:0 0 10px}
+#injTable td:nth-child(3),#injTable th:nth-child(3),#injTable td:nth-child(4),#injTable th:nth-child(4){text-align:left}
+#injTable td.pl small{color:var(--muted);font-weight:500;margin-left:6px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid var(--line);background:var(--surface-2)}
+.badge.q{background:var(--warn-bg);color:var(--warn-ink);border-color:transparent}
+.badge.o{background:var(--bad-bg);color:var(--bad-ink);border-color:transparent}
+td.out{white-space:normal;min-width:220px}
+.explain ul{margin:2px 0 0;padding-left:20px}
 .explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
 </style>
 </head>
@@ -86,10 +95,24 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     <div class="scroll"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
     <p class="check" id="check"></p>
   </section>
+  <section class="panel" id="injuries" hidden aria-label="Key injuries">
+    <h2>Key injuries</h2>
+    <p class="lede" id="injLede"></p>
+    <div class="scroll"><table id="injTable"><thead><tr><th>Player</th><th>Team</th><th>Status</th><th>Outlook in the sim</th><th>Proj pts/wk</th><th>Lineup hit</th></tr></thead><tbody id="injBody"></tbody></table></div>
+  </section>
   <section class="panel explain">
     <div><b>How it works.</b> Each team's strength comes from its roster and its scoring history. Every simulated season plays out the remaining schedule with random weekly scores, sets each team's best lineup, applies injuries and bye weeks, then seeds the teams. The odds are the share of simulated seasons where a team gets in.</div>
     <div><b>Columns.</b> Avg Seed is the team's average seed in the simulated seasons where it gets in. #1 Seed is the chance of the top seed. Bye Odds is the chance of landing on any seed you marked for a bye. Record Spot and Points Spot split the playoff odds by how the team got in (shown when you mix both). Playoff Odds is the total chance of getting in.</div>
-    <div>Results are estimates. Questionable players are treated as 78% likely to play, and Sleeper only updates records on Tuesday morning.</div>
+    <div><b>Injuries.</b> Every simulated season re-checks who is available each week, using Sleeper's injury statuses:
+      <ul>
+        <li><b>Questionable:</b> 78% chance to play.</li>
+        <li><b>Doubtful:</b> 10% chance to play, then 45% chance each week to be back.</li>
+        <li><b>Out:</b> misses the next game, then a 75% chance each week to return.</li>
+        <li><b>IR, PUP and suspended:</b> follow Sleeper's weekly projections, so they sit until projections show them back.</li>
+        <li><b>New injuries</b> can happen to anyone as the season plays out, a little more often for running backs.</li>
+      </ul>
+      Each week the best legal lineup is rebuilt from whoever is available, and empty spots are filled with the best free agent in your league. The Key injuries panel lists injured players who would start, and Lineup hit is how many points that team's best lineup loses in a week he sits.</div>
+    <div>Results are estimates. Injury statuses come from Sleeper's player list when you run, and Sleeper only updates records on Tuesday morning.</div>
   </section>
 </div>
 <script>
@@ -178,6 +201,7 @@ function finish(r) {
   setBusy(false);
   lastRun = { r, demo: wasDemo };
   drawResults();
+  drawInjuries(r);
   status(wasDemo ? "sample" : "", wasDemo ? "Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real odds." : "");
 }
 function drawResults() {
@@ -201,6 +225,21 @@ function drawResults() {
   $("results").hidden = false;
 }
 $("eachSeed").addEventListener("change", drawResults);
+function drawInjuries(r) {
+  const list = r.injuries || [];
+  $("injuries").hidden = false;
+  $("injTable").hidden = !list.length;
+  if (!r.injuries_modelled) { $("injLede").textContent = "Injuries weren't modelled on this run because Sleeper's projections couldn't be loaded, so the odds use scoring history only."; return; }
+  if (!list.length) { $("injLede").textContent = "No injured starters right now. Everyone who matters is listed as healthy."; return; }
+  $("injLede").textContent = `${list.length} injured player${list.length === 1 ? "" : "s"} who would start, biggest lineup hit first. Week ${r.week} is the next game simulated.`;
+  const cls = (s) => /quest/i.test(s) ? "q" : /out|doubt|ir|pup|sus|injured/i.test(s) ? "o" : "";
+  $("injBody").innerHTML = list.map((x) => `<tr>
+    <td class="tm pl">${esc(x.player)}<small>${esc(x.pos)}${x.nfl ? " · " + esc(x.nfl) : ""}</small></td>
+    <td>${esc(x.team)}</td>
+    <td><span class="badge ${cls(x.status)}">${esc(x.status)}</span></td>
+    <td class="out">${esc(x.note)}</td>
+    <td>${x.pts.toFixed(1)}</td><td>${x.hit > 0 ? "−" + x.hit.toFixed(1) : "0.0"}</td></tr>`).join("");
+}
 function go(demo) {
   const id = $("leagueId").value.trim();
   if (!demo && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }

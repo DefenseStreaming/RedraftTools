@@ -711,6 +711,8 @@ def build_team_lineups(teams, league, players_db, weeks, week_feeds, hist_feeds,
         tl = TeamLineup(cands, lineup, weeks)
         tl.estimate_typical(rng)
         lineups[rid] = tl
+        if not args.no_injuries:
+            diag.setdefault("injury_detail", []).extend(injury_detail(rid, tl, players_db, weeks, repl))
     missing = [k for k in returns if k not in used_returns]
     if missing:
         raise RuntimeError("--return: no rostered player matched " + ", ".join(missing)
@@ -721,6 +723,37 @@ def build_team_lineups(teams, league, players_db, weeks, week_feeds, hist_feeds,
 # --------------------------------------------------------------------------- #
 # team strength model (shrinkage)
 # --------------------------------------------------------------------------- #
+def injury_detail(rid, tl, players_db, weeks, repl):
+    """Key injured players on one team, for the web page's injury panel."""
+    out = []
+    for i, c in enumerate(tl.cands):
+        st = c.status.strip()
+        pri = primary_position(c.positions)
+        flagged = (c.p0 < 0.95 or c.ret < 0.9 or c.trust) and st.lower() not in ("", "active")
+        if not flagged or c.nominal < repl.get(pri, 0) + 1.5:
+            continue
+        has_pts = [wi for wi, w in enumerate(weeks) if c.weekly.get(w, c.nominal) is not None]
+        plays_next = c.p0 if 0 in has_pts else 0.0
+        if c.trust and c.p0 > 0:                       # IR / PUP / suspended: projections decide
+            note = (f"Projected back week {weeks[has_pts[0]]}" if has_pts
+                    else "Not projected back this regular season")
+        elif plays_next == 0:
+            note = f"Misses week {weeks[0]}, then {c.ret:.0%} chance each week to return"
+        elif plays_next < 0.5:
+            note = f"{plays_next:.0%} to play week {weeks[0]}, then {c.ret:.0%} each week"
+        else:
+            note = f"{plays_next:.0%} to play week {weeks[0]}"
+        hit = 0.0                                      # starting-lineup points lost when he sits
+        if has_pts:
+            wi = has_pts[0]
+            hit = max(0.0, tl.score(wi, 0) - tl.score(wi, 1 << i))
+        info = players_db.get(c.pid) or {}
+        out.append({"roster_id": rid, "player": c.name, "pos": pri, "nfl": str(info.get("team") or ""),
+                    "status": st, "play_next": round(100 * plays_next), "note": note,
+                    "pts": round(c.nominal, 1), "hit": round(hit, 1)})
+    return out
+
+
 def weighted_stats(scores, last_week, halflife):
     ws = [0.5 ** (max(0, last_week - w) / halflife) for w, _ in scores]
     sw = sum(ws)
@@ -1224,6 +1257,11 @@ def run_league(args, quiet=False):
     sim = simulate(teams, schedule, level_mean, level_sd, minfo["sigma"], lineups, args,
                    sims=1 if complete else args.simulations, rng=rng, live=live)
     results = build_results(teams, sim, rule, byes)
+    names = {rid: t["name"] for rid, t in teams.items()}
+    args._injuries = sorted(({**d, "team": names[d["roster_id"]]} for d in (diag or {}).get("injury_detail", [])),
+                            key=lambda d: (-d["hit"], -d["pts"]))
+    args._first_week = weeks[0] if weeks else None
+    args._have_lineups = bool(lineups)
     if not quiet:
         say(f"Simulated in {time.time() - t0:.1f}s\n")
         print_table(results, args.detail, rule, byes, args.each_seed)
@@ -1917,7 +1955,9 @@ def run_web(league_id, simulations=5000, questionable_prob=0.78, record_seeds=6,
     rule, bys = seed_rule(args), bye_seeds(args)
     head, rows = table(results, False, rule, bys)
     return json.dumps({"head": head, "rows": rows, "results": results, "sims": args.simulations,
-                       "rule": rule, "byes": bys, "spots": min(len(rule), len(results))})
+                       "rule": rule, "byes": bys, "spots": min(len(rule), len(results)),
+                       "injuries": getattr(args, "_injuries", []), "week": getattr(args, "_first_week", None),
+                       "injuries_modelled": not args.no_injuries and getattr(args, "_have_lineups", False)})
 
 
 if __name__ == "__main__":
