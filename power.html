@@ -81,10 +81,21 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .tip b{font-size:13px}.tip div{display:flex;gap:6px;align-items:center;justify-content:space-between}.tip div span:first-child{display:flex;gap:6px;align-items:center}
 .tip i{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--context)}
 .tip .hl{font-weight:700}
-.tiers{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:14px}
-.tiers div{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--muted)}
-.tiers div b{color:var(--ink);display:block}
-.tiers .chip2{flex:none;width:14px;height:40px;border-radius:4px;margin-top:2px}
+/* tier pop-up */
+button.tier{width:100%;border:0;border-radius:0;text-align:left;min-height:auto;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+button.tier::after{content:"ⓘ";font-family:var(--body);font-size:15px;opacity:.75}
+.legend button,td button.pill{border:0;cursor:pointer;min-height:28px}
+.legend button{font-size:12px;font-weight:600;color:#fff;padding:3px 10px;border-radius:99px}
+td button.pill{min-height:24px;padding:2px 8px}
+.chartbox text.tierlbl{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+dialog#tierDlg{border:1px solid var(--line);border-radius:12px;padding:0;max-width:420px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+dialog#tierDlg::backdrop{background:rgba(0,0,0,.45)}
+#tierDlg .band{padding:14px 18px;color:#fff;font-family:var(--display);font-size:28px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;display:flex;justify-content:space-between;align-items:center;gap:12px}
+#tierDlg .band button{background:transparent;border:0;color:#fff;font-size:24px;min-height:36px;width:36px;padding:0;line-height:1}
+#tierDlg .body{padding:14px 18px 18px;display:flex;flex-direction:column;gap:10px}
+#tierDlg .range{font-weight:600}
+#tierDlg .desc{margin:0;color:var(--ink)}
+#tierDlg .who{margin:0;color:var(--muted);font-size:14px}
 details{margin-top:12px}summary{cursor:pointer;font-weight:600;font-size:14px;min-height:32px}
 td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:2px 8px;border-radius:99px}
 </style>
@@ -113,22 +124,26 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
     <div class="legend" id="legend"></div>
     <section class="panel viz" id="history" style="margin-top:16px" aria-label="Score history">
       <h2>Score by week</h2>
-      <p class="lede" id="histLede">Each line is a team's power score after every week. Pick up to three teams to highlight. Hover a week to see everyone.</p>
+      <p class="lede" id="histLede">Each line is a team's power score after every week. Pick up to three teams to highlight, hover a week to see everyone, and tap a tier name to see what it means.</p>
       <div class="picks" id="picks"></div>
       <div class="chartbox" id="chartbox"></div>
       <details><summary>Show as a table</summary><div class="scroll" style="margin-top:6px"><table id="histTable"></table></div></details>
-      <div class="tiers" id="tierDesc"></div>
     </section>
     <div class="panel scroll"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
   </section>
   <section class="panel explain">
     <div><b>How the score works.</b> Each team gets three numbers: win percentage, total points scored, and roster strength. Each one is turned into a z-score (how far above or below the league average, in standard deviations). The z-scores are weighted 50% record, 30% points and 20% roster, then scaled to a 0–100 score where 50 is average: score = (weighted z + 2.5) ÷ 5 × 100.</div>
     <div><b>Roster strength</b> is the best legal starting lineup each team can field, averaged over the next four weeks, using your league's scoring. Each player's weekly number is 50% his points per game so far and 50% Sleeper's projected points per game. A player on bye that week, or projected out, counts as zero, Questionable players count 78% for the coming game and Doubtful 10%. Empty spots are filled at waiver-wire level.</div>
+    <div><b>Tiers.</b> Tap any tier banner, legend chip or tier name on the chart to see what it means and who's in it.</div>
     <div><b>Movement</b> compares with last week's rankings, rebuilt from last week's record and points with the same roster score.</div>
     <div><b>Score by week</b> rebuilds every past week from that week's record and points for, plus the roster the team actually had that week (from Sleeper's weekly lineups). Those rosters are rated by what each player has done and is projected to do this season. The last point is this week's score.</div>
   </section>
 </div>
-<script src="sleeper-core.js"></script>
+<dialog id="tierDlg" aria-labelledby="tierDlgTitle">
+  <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
+  <div class="body"><div class="range" id="tierDlgRange"></div><p class="desc" id="tierDlgDesc"></p><p class="who" id="tierDlgWho"></p></div>
+</dialog>
+<script src="sleeper-core.js?v=20261127c"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -144,7 +159,7 @@ const TIER_TEXT = {
   "Pit of Doom and Despair": "The bottom of the league. Time to play spoiler and start thinking about next year.",
 };
 const TIER_CLASS = { "Thanos": "t-thanos", "Juggernaut": "t-juggernaut", "Playoff Contender": "t-contender", "Playoff Hopeful": "t-hopeful", "Purgatory": "t-purgatory", "Pit of Doom and Despair": "t-pit" };
-$("legend").innerHTML = SleeperCore.TIERS.map(([lo, n]) => `<span class="${TIER_CLASS[n]}">${esc(n)}${lo > -Infinity ? " " + lo + "+" : " &lt;30"}</span>`).join("");
+$("legend").innerHTML = SleeperCore.TIERS.map(([lo, n]) => `<button type="button" class="${TIER_CLASS[n]}" data-tier="${esc(n)}">${esc(n)}${lo > -Infinity ? " " + lo + "+" : " &lt;30"}</button>`).join("");
 function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
 const rec = (r) => `${r.wins}-${r.losses}` + (r.ties ? `-${r.ties}` : "");
 function moveHtml(m) {
@@ -159,9 +174,9 @@ function render(b, rows, sample) {
     <div class="top"><div><div class="rk">${r.rank}</div>${moveHtml(r.move)}</div>
       <div style="min-width:0"><div class="nm">${esc(r.name)}</div><div class="sub2">${rec(r)} · ${r.pf.toFixed(1)} PF</div></div>
       <div class="sc"><b>${r.score.toFixed(1)}</b><span>Score</span></div></div>
-    <div class="tier ${TIER_CLASS[r.tier]}">${esc(r.tier)}</div></article>`).join("");
+    <button type="button" class="tier ${TIER_CLASS[r.tier]}" data-tier="${esc(r.tier)}" aria-label="${esc(r.tier)}: what this tier means">${esc(r.tier)}</button></article>`).join("");
   const z = (v) => (v >= 0 ? "+" : "") + v.toFixed(2);
-  $("body").innerHTML = rows.map((r) => `<tr><td>${r.rank}</td><td class="tm">${esc(r.name)}</td><td><span class="pill ${TIER_CLASS[r.tier]}">${esc(r.tier)}</span></td>
+  $("body").innerHTML = rows.map((r) => `<tr><td>${r.rank}</td><td class="tm">${esc(r.name)}</td><td><button type="button" class="pill ${TIER_CLASS[r.tier]}" data-tier="${esc(r.tier)}">${esc(r.tier)}</button></td>
     <td>${rec(r)}</td><td>${r.pf.toFixed(1)}</td><td>${r.roster.toFixed(1)}</td><td>${z(r.zWin)}</td><td>${z(r.zPf)}</td><td>${z(r.zRoster)}</td><td class="last">${r.score.toFixed(1)}</td></tr>`).join("");
   $("results").hidden = false;
   drawHistory(b, rows);
@@ -173,10 +188,34 @@ function render(b, rows, sample) {
 }
 /* ---------- score-by-week chart ---------- */
 let H = null;
+const last = (a) => a[a.length - 1];
 const SVGNS = "http://www.w3.org/2000/svg";
 const tierRanges = () => { const t = SleeperCore.TIERS; return t.map(([lo, n], i) => ({ name: n, lo, hi: i ? t[i - 1][0] : Infinity })); };
-$("tierDesc").innerHTML = tierRanges().map((t) => `<div><span class="chip2" style="background:${TIER_COLOR[t.name]}"></span><span><b>${esc(t.name)} · ${t.lo === -Infinity ? "below 30" : t.hi === Infinity ? t.lo + "+" : `${t.lo}–${(t.hi - 0.1).toFixed(1)}`}</b>${esc(TIER_TEXT[t.name])}</span></div>`).join("");
+let lastRows = [];
+function openTier(name) {
+  const t = tierRanges().find((x) => x.name === name);
+  if (!t) return;
+  $("tierDlgBand").style.background = TIER_COLOR[name];
+  $("tierDlgTitle").textContent = name;
+  $("tierDlgRange").textContent = t.lo === -Infinity ? "Score below 30" : t.hi === Infinity ? `Score of ${t.lo} or more` : `Score of ${t.lo} to ${(t.hi - 0.1).toFixed(1)}`;
+  $("tierDlgDesc").textContent = TIER_TEXT[name];
+  const who = lastRows.filter((r) => r.tier === name).map((r) => `${r.name} (${r.score.toFixed(1)})`);
+  $("tierDlgWho").textContent = lastRows.length ? (who.length ? `Here now: ${who.join(", ")}` : "Nobody is in this tier right now.") : "";
+  const d = $("tierDlg");
+  if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest && e.target.closest("[data-tier]");
+  if (t) { openTier(t.getAttribute("data-tier")); return; }
+  if (e.target === $("tierDlg")) $("tierDlg").close();            // tap outside the box
+});
+document.addEventListener("keydown", (e) => {
+  const t = e.target.closest && e.target.closest("text[data-tier]");
+  if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTier(t.getAttribute("data-tier")); }
+});
+$("tierDlgClose").addEventListener("click", () => $("tierDlg").close());
 function drawHistory(b, rows) {
+  lastRows = rows;
   const box = $("history");
   if (!H || !H.hist.weeks.length) { box.hidden = true; return; }
   box.hidden = false;
@@ -187,7 +226,7 @@ function drawHistory(b, rows) {
 }
 const pickColor = (rid) => { const i = H.picks.indexOf(rid); return i < 0 ? null : `var(--series-${i + 1})`; };
 function drawPicks() {
-  const order = H.teams.slice().sort((a, c) => H.hist.series[c.rid].at(-1) - H.hist.series[a.rid].at(-1));
+  const order = H.teams.slice().sort((a, c) => last(H.hist.series[c.rid]) - last(H.hist.series[a.rid]));
   $("picks").innerHTML = order.map((t) => { const c = pickColor(t.rid);
     return `<button type="button" data-rid="${t.rid}" aria-pressed="${!!c}"><span class="sw"${c ? ` style="background:${c}"` : ""}></span>${esc(t.name)}</button>`; }).join("");
 }
@@ -216,7 +255,7 @@ function drawChart() {
     if (!narrow) {                                   // tier name beside its band, in text ink
       const mid = (y(top) + y(bot)) / 2;
       el("rect", { x: m.l - 30, y: mid - 6, width: 4, height: 12, rx: 1, fill: TIER_COLOR[t.name] }, svg);
-      const lbl = el("text", { x: m.l - 36, y: mid + 4, class: "tierlbl", "text-anchor": "end" }, svg);
+      const lbl = el("text", { x: m.l - 36, y: mid + 4, class: "tierlbl", "text-anchor": "end", "data-tier": t.name, role: "button", tabindex: 0 }, svg);
       lbl.textContent = t.name;
     }
     if (bot > lo) { el("line", { x1: m.l, x2: W - m.r, y1: y(bot), y2: y(bot), stroke: "var(--line)", "stroke-width": 1 }, svg);
@@ -238,7 +277,7 @@ function drawChart() {
     const c = pickColor(rid);
     el("path", { d: path(rid), fill: "none", stroke: c, "stroke-width": 2.5, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
     series[rid].forEach((v, i) => el("circle", { cx: x(i), cy: y(v), r: 4, fill: c, stroke: "var(--surface)", "stroke-width": 2 }, svg));
-    labels.push({ rid, c, y: y(series[rid].at(-1)) });
+    labels.push({ rid, c, y: y(last(series[rid])) });
   }
   // direct labels at the line ends, nudged apart
   labels.sort((a, c) => a.y - c.y);
