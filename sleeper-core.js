@@ -179,7 +179,7 @@
     }
     const owner = {};
     for (const t of teams) for (const pid of t.players) owner[pid] = t.rid;
-    const pids = new Set(Object.keys(owner));
+    const pids = new Set([...Object.keys(owner), ...Object.keys(tot)]);   // includes players since dropped
     const projW = {};
     for (const w of remaining) {
       projW[w] = {};
@@ -333,6 +333,40 @@
     }));
   }
 
+  // power score for every week played: that week's record and points for, plus the roster the team
+  // actually had that week (from Sleeper's weekly matchups), rated by what each player has done and
+  // is projected to do. The last week is replaced by the current rankings so the line ends on today's score.
+  function powerHistory(b, vals, current) {
+    const weeks = [], series = {}, ranks = {};
+    for (const t of b.teams) { series[t.rid] = []; ranks[t.rid] = []; }
+    const histRate = (pid) => {
+      const p = vals.players[pid];
+      if (!p) return null;
+      return p.games ? 0.5 * p.ppg + 0.5 * (p.projPg || p.ppg) : p.rate;
+    };
+    for (let w = 1; w <= b.gp; w++) {
+      let sc;
+      if (w === b.gp && current) sc = Object.fromEntries(current.map((r) => [r.rid, r.score]));
+      else {
+        const rec = standingsThrough(b, w);
+        const rosterAt = {};
+        for (const row of b.matchups[w] || []) rosterAt[row.roster_id] = (row.players || []).map(String);
+        const rows = b.teams.map((t) => {
+          const r = rec[t.rid], g = r.w + r.l + r.t;
+          const pool = (rosterAt[t.rid] || t.players).map((pid) => ({ pts: histRate(pid), pos: (vals.players[pid] || {}).pos }))
+            .filter((x) => x.pts !== null && x.pos);
+          return { rid: t.rid, winPct: g ? (r.w + 0.5 * r.t) / g : 0.5, pf: r.pf, roster: bestLineup(pool, b.slots, vals.repl).total };
+        });
+        const ps = powerScores(rows);
+        sc = Object.fromEntries(rows.map((r) => [r.rid, ps[r.rid].score]));
+      }
+      weeks.push(w);
+      const order = Object.keys(sc).sort((x, y) => sc[y] - sc[x]);
+      for (const t of b.teams) { series[t.rid].push(sc[t.rid]); ranks[t.rid].push(order.indexOf(String(t.rid)) + 1); }
+    }
+    return { weeks, series, ranks };
+  }
+
   /* ---------------- trades ---------------- */
   const DEPTH = [1, 0.85, 0.72, 0.62, 0.55];   // extra pieces count for less: you can only start so many
   const sideValue = (vals) => vals.slice().sort((a, b) => b - a).reduce((s, v, i) => s + v * DEPTH[Math.min(i, DEPTH.length - 1)], 0);
@@ -468,7 +502,7 @@
   }
 
   const api = { API, POSITIONS, SLOT_ACCEPTS, TIERS, liveNet, makeSampleNet, loadLeague, computeValues, bestLineup,
-    lineupStrength, powerRankings, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
+    lineupStrength, powerRankings, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
     settings: { DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SleeperCore = api;

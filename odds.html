@@ -102,7 +102,7 @@ td.out{white-space:normal;min-width:220px}
   </section>
   <section class="panel explain">
     <div><b>How it works.</b> Each team's strength comes from its roster and its scoring history. Every simulated season plays out the remaining schedule with random weekly scores, sets each team's best lineup, applies injuries and bye weeks, then seeds the teams. The odds are the share of simulated seasons where a team gets in.</div>
-    <div><b>Columns.</b> Avg Seed is the team's average seed in the simulated seasons where it gets in. #1 Seed is the chance of the top seed. Bye Odds is the chance of landing on any seed you marked for a bye. Record Spot and Points Spot split the playoff odds by how the team got in (shown when you mix both). Playoff Odds is the total chance of getting in.</div>
+    <div><b>Columns.</b> Avg Seed is the team's average seed in the simulated seasons where it gets in. Bye Odds is the chance of landing on any seed you marked for a bye. Record Spot and Points Spot split the playoff odds by how the team got in (shown when you mix both). Playoff Odds is the total chance of getting in.</div>
     <div><b>Injuries.</b> Every simulated season re-checks who is available each week, using Sleeper's injury statuses:
       <ul>
         <li><b>Questionable:</b> 78% chance to play.</li>
@@ -209,7 +209,7 @@ function drawResults() {
   const r = lastRun.r, res = r.results, spots = r.spots, byes = r.byes;
   const mixed = r.rule.includes("R") && r.rule.includes("P"), each = $("eachSeed").checked;
   const cols = [["Rank", (x, i) => i + 1], ["Team", (x) => x.team],
-    ["Avg Seed", (x) => x.avg_seed == null ? "--" : x.avg_seed.toFixed(1)], ["#1 Seed Odds", (x) => fpct(x.seed1)]];
+    ["Avg Seed", (x) => x.avg_seed == null ? "--" : x.avg_seed.toFixed(1)],];
   if (byes.length) cols.push([`Bye Odds (${byes.map(ordinal).join(", ")})`, (x) => fpct(x.bye)]);
   if (mixed) cols.push(["Record Spot Odds", (x) => fpct(x.via_record)], ["Points Spot Odds", (x) => fpct(x.via_points)]);
   if (each) for (let k = 0; k < spots; k++) cols.push([`${ordinal(k + 1)} (${r.rule[k] === "P" ? "pts" : "rec"})`, (x) => fpct(x.seed_pcts[k])]);
@@ -217,11 +217,11 @@ function drawResults() {
   $("head").innerHTML = "<tr>" + cols.map(([h]) => `<th>${esc(h)}</th>`).join("") + "</tr>";
   $("body").innerHTML = res.map((x, i) => `<tr class="${i < spots ? "in" : ""}">` + cols.map(([, f], k) =>
     `<td class="${k === 1 ? "tm" : ""}${k === cols.length - 1 ? " last" : ""}">${esc(f(x, i))}</td>`).join("") + "</tr>").join("");
-  const pl = res.reduce((a, x) => a + x.playoff, 0) / 100, s1 = res.reduce((a, x) => a + x.seed1, 0) / 100;
+  const pl = res.reduce((a, x) => a + x.playoff, 0) / 100;
   const by = res.reduce((a, x) => a + x.bye, 0) / 100;
   $("check").textContent = `Seeding: ${[...r.rule.slice(0, spots)].map((m, k) => `${k + 1} ${m === "P" ? "pts" : "rec"}`).join(" · ")}`
-    + ` | Checks: #1 Seed adds to ${s1.toFixed(2)} (should be 1)` + (byes.length ? ` | Bye Odds adds to ${by.toFixed(2)} (should be ${byes.length})` : "")
-    + ` | Playoff Odds adds to ${pl.toFixed(2)} (should be ${spots}) | ${r.sims.toLocaleString()} simulations`;
+    + ` | Checks: ` + (byes.length ? `Bye Odds adds to ${by.toFixed(2)} (should be ${byes.length}) | ` : "")
+    + `Playoff Odds adds to ${pl.toFixed(2)} (should be ${spots}) | ${r.sims.toLocaleString()} simulations`;
   $("results").hidden = false;
 }
 $("eachSeed").addEventListener("change", drawResults);
