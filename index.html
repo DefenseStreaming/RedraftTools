@@ -18,7 +18,23 @@ a.card:hover{border-color:var(--accent)}a.card:focus-visible{outline:3px solid v
 .tag.soon{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
 .card.off{opacity:.75}
 footer{color:var(--muted);font-size:13px}
-</style></head><body><div class="wrap">
+</style><script>
+/* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
+   copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
+(function () {
+  var MINE = "2026-11-27f";
+  try {
+    fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+      if (!v || !v.version || v.version === MINE) return;
+      var u = new URL(location.href);
+      if (u.searchParams.get("v") === v.version) return;          // already tried: don't loop
+      u.searchParams.set("v", v.version);
+      location.replace(u.toString());
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
+</head><body><div class="wrap">
 <header><h1>Sleeper Tools</h1><p class="lede">Fantasy football tools that use your own league's scoring and settings. Enter a Sleeper league ID and go.</p></header>
 <section class="cards" aria-label="Tools">
 <a class="card" href="defense.html"><span class="tag">Live</span><h2>Defense Streamer</h2><p>Ranks every defense for the next three weeks using your league's defense scoring.</p></a>

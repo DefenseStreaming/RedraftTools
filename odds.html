@@ -111,6 +111,22 @@ td.out{white-space:normal;min-width:220px}
   .pg .more{font-size:1.4cqw;color:#4f6370;margin:.4cqw 0 0}
 }
 </style>
+<script>
+/* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
+   copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
+(function () {
+  var MINE = "2026-11-27f";
+  try {
+    fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+      if (!v || !v.version || v.version === MINE) return;
+      var u = new URL(location.href);
+      if (u.searchParams.get("v") === v.version) return;          // already tried: don't loop
+      u.searchParams.set("v", v.version);
+      location.replace(u.toString());
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html" aria-current="page">Playoff Odds</a></div></nav>
