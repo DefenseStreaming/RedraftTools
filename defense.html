@@ -108,7 +108,7 @@ tr.top td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27k";
+  var MINE = "2026-11-27l";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -122,7 +122,7 @@ tr.top td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
 </script>
 </head>
 <body>
-<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html" aria-current="page">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html" aria-current="page">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="analysis.html">League Analysis</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
 <div class="wrap">
   <header>
     <h1>Defense Streamer</h1>
@@ -549,6 +549,6 @@ if (typeof document !== "undefined") {
 }
 if (typeof module !== "undefined") module.exports = { defPoints, tierValue, parseDefRows, parseSchedule, fitEffects, rankDefenses, weekBoards, weightsFrom, computeAll, projDefPoints, roundHalfEven };
 </script>
-<script src="leagues.js?v=2026-11-27k"></script>
+<script src="leagues.js?v=2026-11-27l"></script>
 </body>
 </html>

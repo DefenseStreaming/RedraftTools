@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>League Analysis | Sleeper Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f4;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#5b6f7c;--line:#d6dee3;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;--display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:40px;line-height:1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:64ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row .grow{flex:2 1 260px}.row .sm{flex:1 1 130px}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-size:22px;letter-spacing:.03em;font-weight:600;padding:6px 32px}
+button:disabled{opacity:.6;cursor:progress}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.banner{border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:8px}
+.banner.error{background:var(--bad-bg);color:var(--bad-ink)}
+.banner.note{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.banner.sample{background:var(--warn-bg);color:var(--warn-ink)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;font-weight:600;white-space:nowrap}
+th:nth-child(1),th:nth-child(2),td:nth-child(1),td:nth-child(2){text-align:left}
+td{padding:9px 10px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+td.tm{font-weight:600}
+td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
+tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+.controls{display:grid;gap:12px;grid-template-columns:minmax(0,320px)}
+h2{font-family:var(--display);font-size:28px;margin:0 0 2px}
+.lead{color:var(--muted);font-size:14px;margin:0 0 12px;max-width:80ch}
+.st td.tm{text-align:left;white-space:normal;font-weight:600;min-width:140px}
+.st td.tm small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.st th:nth-child(2){text-align:left}
+.st td.big{font-family:var(--display);font-size:22px;font-weight:700;color:var(--accent)}
+.st td.mut{color:var(--muted)}
+.mv{font-size:12px;font-weight:700;margin-left:4px}.mv.up{color:#1f8a4c}.mv.dn{color:#c0392b}
+.lk.pos{color:#1f8a4c;font-weight:600}.lk.neg{color:#c0392b;font-weight:600}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .mv.up,:root:not([data-theme="light"]) .lk.pos{color:#4fd18b}:root:not([data-theme="light"]) .mv.dn,:root:not([data-theme="light"]) .lk.neg{color:#ff8a7a}}
+:root[data-theme="dark"] .mv.up,:root[data-theme="dark"] .lk.pos{color:#4fd18b}:root[data-theme="dark"] .mv.dn,:root[data-theme="dark"] .lk.neg{color:#ff8a7a}
+@media(max-width:700px){.st td,.st th{padding:8px 5px}.st th{font-size:11px;letter-spacing:.03em}.st .hide-sm{display:none}.st td.tm{min-width:110px;font-size:15px}.st td.big{font-size:19px}}
+</style>
+<script>
+/* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
+   copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
+(function () {
+  var MINE = "2026-11-27l";
+  try {
+    fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+      if (!v || !v.version || v.version === MINE) return;
+      var u = new URL(location.href);
+      if (u.searchParams.get("v") === v.version) return;          // already tried: don't loop
+      u.searchParams.set("v", v.version);
+      location.replace(u.toString());
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="analysis.html" aria-current="page">League Analysis</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>League Analysis</h1>
+    <p class="sub">Median Scoring Standings and All Play Standings</p>
+  </header>
+  <section class="panel" aria-label="League">
+    <div class="row">
+      <div class="grow"><label class="f" for="leagueId">Sleeper league ID</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="run" class="primary" type="button">Load league</button>
+      <button id="demo" type="button">Use sample data</button>
+    </div>
+  </section>
+  <section id="status" aria-live="polite"></section>
+  <div id="app" hidden>
+    <section class="panel" aria-label="Season">
+      <div class="controls"><div><label class="f" for="season">Season</label><select id="season"></select></div></div>
+      <p class="hint" id="seasonNote"></p>
+    </section>
+    <section class="panel" aria-labelledby="medH">
+      <h2 id="medH">Median Scoring Standings</h2>
+      <p class="lead">Every week each team plays its real opponent and also the league median. Score above the median is a second win, below it is a second loss. The arrow shows the change from the real head-to-head standings.</p>
+      <div class="scroll"><table class="st"><thead id="medHead"></thead><tbody id="medList"></tbody></table></div>
+    </section>
+    <section class="panel" aria-labelledby="allH">
+      <h2 id="allH">All Play Standings</h2>
+      <p class="lead">Every week each team plays every other team. Beat 9 of 11 teams and that week counts 9-2. It shows who would lead with no schedule luck. Luck is real wins minus expected wins (all-play win rate times games played).</p>
+      <div class="scroll"><table class="st"><thead id="allHead"></thead><tbody id="allList"></tbody></table></div>
+    </section>
+  </div>
+  <section class="panel explain">
+    <div><b>Which weeks count.</b> Finished regular-season weeks only. Playoff weeks and the week in progress are left out. Ties with the median (exactly the median score) count as a tie.</div>
+    <div><b>Seasons.</b> Past seasons come from Sleeper's link between each season's league and the one before it. If your league was recreated instead of renewed in Sleeper, older seasons won't appear. <b>All time</b> adds up every season by manager, so a manager keeps their history even if their team name or roster slot changed. The name shown is their latest team name.</div>
+  </section>
+</div>
+<script src="sleeper-core.js?v=2026-11-27l"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
+
+let H = null, notes = [];
+const rec = (w, l, t) => `${w}-${l}${t ? "-" + t : ""}`;
+const pct = (x) => x.toFixed(3).replace(/^0/, "");
+const n1 = (x) => x.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+function teamCell(r, allTime) {
+  const sub = [r.owner && r.owner !== r.name ? r.owner : "", allTime ? `${r.seasons} season${r.seasons === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+  return `<td class="tm">${esc(r.name)}${sub ? `<small>${esc(sub)}</small>` : ""}</td>`;
+}
+function draw() {
+  const v = $("season").value, allTime = v === "all";
+  const sel = allTime ? H.seasons : H.seasons.filter((s) => s.season === v);
+  const A = SleeperCore.analyzeSeasons(sel);
+  const s0 = sel[0];
+  const parts = [];
+  if (!A.weeks) parts.push(allTime ? "No finished weeks yet." : `No finished regular-season weeks in ${v} yet.`);
+  else parts.push(allTime ? `${H.seasons.length} season${H.seasons.length === 1 ? "" : "s"} (${H.seasons[H.seasons.length - 1].season}–${H.seasons[0].season}), ${A.weeks} weeks.`
+    : `${A.weeks} finished week${A.weeks === 1 ? "" : "s"}${s0.lastDone < s0.regEnd ? ` of ${s0.regEnd} so far` : ""}.`);
+  if (sel.some((s) => s.sleeperMedian)) parts.push("Your league already plays the median in Sleeper; the head-to-head record here leaves those games out so you can compare.");
+  $("seasonNote").textContent = parts.join(" ");
+  const empty = (cols) => `<tr><td colspan="${cols}" style="text-align:center;color:var(--muted);padding:20px">No finished weeks to show.</td></tr>`;
+
+  $("medHead").innerHTML = `<tr><th>#</th><th>Team</th><th title="Record with median games added">Record</th><th class="hide-sm">Win %</th><th class="hide-sm" title="Real head-to-head record">H2H</th><th title="Record against the weekly median">vs Med.</th><th class="hide-sm">Points for</th></tr>`;
+  $("medList").innerHTML = A.weeks ? A.median.map((r) => {
+    const d = r.h2hRank - r.medRank;
+    const mv = d > 0 ? `<span class="mv up" title="Up ${d} from H2H standings">▲${d}</span>` : d < 0 ? `<span class="mv dn" title="Down ${-d} from H2H standings">▼${-d}</span>` : "";
+    return `<tr><td>${r.medRank}${mv}</td>${teamCell(r, allTime)}<td class="big">${rec(r.cw, r.cl, r.ct)}</td><td class="hide-sm">${pct(r.combPct)}</td>
+      <td class="hide-sm mut">${rec(r.w, r.l, r.t)}</td><td>${rec(r.mw, r.ml, r.mt)}</td><td class="hide-sm">${n1(r.pf)}</td></tr>`;
+  }).join("") : empty(7);
+
+  $("allHead").innerHTML = `<tr><th>#</th><th>Team</th><th>All-play</th><th>Win %</th><th class="hide-sm" title="Real head-to-head record">H2H</th><th class="hide-sm" title="All-play win rate times games played">Exp. wins</th><th title="Real wins minus expected wins">Luck</th></tr>`;
+  $("allList").innerHTML = A.weeks ? A.allPlay.map((r) => {
+    const lk = r.luck, cls = lk > 0.25 ? "pos" : lk < -0.25 ? "neg" : "";
+    return `<tr><td>${r.allRank}</td>${teamCell(r, allTime)}<td class="big">${rec(r.aw, r.al, r.at)}</td><td>${pct(r.allPct)}</td>
+      <td class="hide-sm mut">${rec(r.w, r.l, r.t)}</td><td class="hide-sm">${r.xw.toFixed(1)}</td><td class="lk ${cls}">${lk >= 0 ? "+" : "−"}${Math.abs(lk).toFixed(1)}</td></tr>`;
+  }).join("") : empty(7);
+}
+function start(sample) {
+  $("app").hidden = false;
+  const cur = H.seasons[0].season;
+  $("season").innerHTML = H.seasons.map((s) => `<option value="${esc(s.season)}">${esc(s.season)}${s.current ? " (current)" : ""}</option>`).join("") +
+    (H.seasons.length > 1 ? `<option value="all">All time</option>` : "");
+  $("season").value = cur;
+  notes = [];
+  if (sample) notes.push("Sample data. These are made-up teams so you can try it. Enter your league ID and press Load league for your real league.");
+  if (H.seasons.length === 1) notes.push("Sleeper only has this one season for your league, so All time isn't shown.");
+  status(sample ? "sample" : notes.length ? "note" : "", notes.join(" "));
+  draw();
+}
+async function go(sample) {
+  const id = $("leagueId").value.trim();
+  if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Load league."); return; }
+  if (!sample) store.set("oddsLeague", id);
+  $("run").disabled = $("demo").disabled = true;
+  try {
+    const net = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
+    H = await SleeperCore.loadLeagueHistory(net, sample ? "sample" : id, (t) => status("note", t));
+    start(sample);
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);
+  } finally { $("run").disabled = $("demo").disabled = false; }
+}
+$("season").addEventListener("change", draw);
+$("run").addEventListener("click", () => go(false));
+$("demo").addEventListener("click", () => go(true));
+$("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
+</script>
+<script src="leagues.js?v=2026-11-27l"></script>
+</body>
+</html>

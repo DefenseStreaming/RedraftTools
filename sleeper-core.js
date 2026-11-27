@@ -590,6 +590,117 @@
     return { rows, result, form, recentN, histTo, projWeight: pw };
   }
 
+  /* ---------------- league analysis: median and all-play standings, every season ----------------
+     Seasons are linked through Sleeper's previous_league_id. Only finished regular-season weeks count.
+     All-time totals follow the manager (Sleeper user), not the roster slot, so they survive renumbering. */
+  async function loadLeagueHistory(net, leagueId, say = () => {}) {
+    say("Reading your league…");
+    const state = await net.fetchJson(`${API}/state/nfl`).catch(() => ({}));
+    const chain = [];
+    let id = String(leagueId);
+    const seen = new Set();
+    while (id && id !== "0" && !seen.has(id) && chain.length < 20) {
+      seen.add(id);
+      let lg = null;
+      try { lg = await net.fetchJson(`${API}/league/${id}`); } catch (e) { if (!chain.length) throw e; }
+      if (!lg || typeof lg !== "object" || !lg.settings) {
+        if (!chain.length) throw new Error("That league was not found or is not public. Check the league ID.");
+        break;
+      }
+      chain.push(lg);
+      id = lg.previous_league_id ? String(lg.previous_league_id) : null;
+    }
+    const seasons = [];
+    for (const lg of chain) {
+      const lid = String(lg.league_id || leagueId);
+      const season = String(lg.season);
+      say(`Reading the ${season} season…`);
+      const st = lg.settings || {};
+      const regEnd = (num(st.playoff_week_start, 15) || 15) - 1;
+      let lastDone = regEnd;
+      if (season === String(state.season) && lg.status !== "complete") {
+        if (state.season_type === "regular") lastDone = Math.min(regEnd, num(state.week, 1) - 1);
+        else if (state.season_type === "pre" || lg.status === "pre_draft" || lg.status === "drafting") lastDone = 0;
+      }
+      const [users, rosters] = await Promise.all([
+        net.fetchJson(`${API}/league/${lid}/users`).catch(() => []), net.fetchJson(`${API}/league/${lid}/rosters`).catch(() => []),
+      ]);
+      const um = {};
+      for (const u of users || []) um[u.user_id] = u;
+      const teams = (rosters || []).map((r) => {
+        const u = um[r.owner_id] || {};
+        return { rid: r.roster_id, key: r.owner_id ? String(r.owner_id) : `${lid}:${r.roster_id}`,
+          name: (u.metadata && u.metadata.team_name) || u.display_name || `Team ${r.roster_id}`, owner: u.display_name || "" };
+      });
+      const wk = [];
+      for (let w = 1; w <= lastDone; w++) wk.push(w);
+      const weeks = (await Promise.all(wk.map(async (w) => {
+        let rows = [];
+        try { rows = (await net.fetchJson(`${API}/league/${lid}/matchups/${w}`)) || []; } catch (e) { rows = []; }
+        rows = rows.map((r) => ({ rid: r.roster_id, pts: num(r.points), mid: r.matchup_id }));
+        return rows.some((r) => r.pts !== 0) ? { w, rows } : null;
+      }))).filter(Boolean);
+      seasons.push({ season, leagueId: lid, name: lg.name || "", teams, weeks, regEnd, lastDone,
+        sleeperMedian: !!st.league_average_match, current: lg === chain[0] });
+    }
+    return { seasons, notes: [] };
+  }
+
+  // seasons: subset of loadLeagueHistory().seasons. One row per manager.
+  function analyzeSeasons(seasons) {
+    const acc = {};
+    const order = seasons.slice().sort((a, b) => +a.season - +b.season);      // oldest first: newest name wins
+    for (const s of order) {
+      const byRid = {};
+      for (const t of s.teams) {
+        byRid[t.rid] = t;
+        const a = acc[t.key] || (acc[t.key] = { key: t.key, seasons: new Set(), games: 0, w: 0, l: 0, t: 0, pf: 0, pa: 0,
+          mw: 0, ml: 0, mt: 0, aw: 0, al: 0, at: 0, xw: 0, weeksHigh: 0, weeksLow: 0 });
+        a.name = t.name; a.owner = t.owner;
+      }
+      for (const wk of s.weeks) {
+        const rows = wk.rows.filter((r) => byRid[r.rid]);
+        if (rows.length < 2) continue;
+        const sorted = rows.map((r) => r.pts).sort((x, y) => x - y);
+        const n = sorted.length, med = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+        const hi = sorted[n - 1], lo = sorted[0];
+        const byM = {};
+        for (const r of rows) if (r.mid != null) (byM[r.mid] = byM[r.mid] || []).push(r);
+        for (const r of rows) {
+          const a = acc[byRid[r.rid].key];
+          a.seasons.add(s.season);
+          a.pf += r.pts;
+          if (r.pts > med) a.mw++; else if (r.pts < med) a.ml++; else a.mt++;
+          let beat = 0, tie = 0;
+          for (const o of rows) if (o !== r) { if (r.pts > o.pts) beat++; else if (r.pts === o.pts) tie++; }
+          a.aw += beat; a.at += tie; a.al += n - 1 - beat - tie;
+          a.xw += (beat + 0.5 * tie) / (n - 1);
+          if (r.pts === hi) a.weeksHigh++;
+          if (r.pts === lo) a.weeksLow++;
+        }
+        for (const pair of Object.values(byM)) {
+          if (pair.length !== 2) continue;
+          const [x, y] = pair, ax = acc[byRid[x.rid].key], ay = acc[byRid[y.rid].key];
+          ax.games++; ay.games++; ax.pa += y.pts; ay.pa += x.pts;
+          if (x.pts > y.pts) { ax.w++; ay.l++; } else if (y.pts > x.pts) { ay.w++; ax.l++; } else { ax.t++; ay.t++; }
+        }
+      }
+    }
+    const pct = (w, l, t) => (w + l + t ? (w + 0.5 * t) / (w + l + t) : 0);
+    const rows = Object.values(acc).filter((a) => a.seasons.size).map((a) => ({ ...a, seasons: a.seasons.size,
+      h2hPct: pct(a.w, a.l, a.t), medPct: pct(a.mw, a.ml, a.mt),
+      cw: a.w + a.mw, cl: a.l + a.ml, ct: a.t + a.mt, combPct: pct(a.w + a.mw, a.l + a.ml, a.t + a.mt),
+      allPct: pct(a.aw, a.al, a.at), luck: a.w + 0.5 * a.t - a.xw }));
+    const h2hOrder = rows.slice().sort((a, b) => b.h2hPct - a.h2hPct || b.pf - a.pf);
+    h2hOrder.forEach((r, i) => { r.h2hRank = i + 1; });
+    const median = rows.slice().sort((a, b) => b.combPct - a.combPct || b.pf - a.pf);
+    median.forEach((r, i) => { r.medRank = i + 1; });
+    const allPlay = rows.slice().sort((a, b) => b.allPct - a.allPct || b.pf - a.pf);
+    allPlay.forEach((r, i) => { r.allRank = i + 1; });
+    const weeks = seasons.reduce((n, s) => n + s.weeks.length, 0);
+    return { median, allPlay, weeks };
+  }
+
   /* ---------------- trades ---------------- */
   const DEPTH = [1, 0.85, 0.72, 0.62, 0.55];   // extra pieces count for less: you can only start so many
   const sideValue = (vals) => vals.slice().sort((a, b) => b - a).reduce((s, v, i) => s + v * DEPTH[Math.min(i, DEPTH.length - 1)], 0);
@@ -702,7 +813,8 @@
     }
     for (const r of rosters) { const x = rec[r.roster_id]; const cents = Math.round(x.fpts * 100); r.settings = { wins: x.wins, losses: x.losses, ties: x.ties, fpts: Math.floor(cents / 100), fpts_decimal: cents % 100 }; }
     const users = NAMES.map((n, i) => ({ user_id: "u" + (i + 1), display_name: "owner" + (i + 1), metadata: { team_name: n } }));
-    const league = { name: opts.dynasty ? "Sample dynasty league" : "Sample league", season: "2026", roster_positions: slots,
+    const league = { league_id: "sample", previous_league_id: "sample2025", status: "in_season",
+      name: opts.dynasty ? "Sample dynasty league" : "Sample league", season: "2026", roster_positions: slots,
       settings: { playoff_week_start: 15, playoff_teams: 7, type: opts.dynasty ? 2 : 0, draft_rounds: 4 },
       scoring_settings: { rec: 1, pass_yd: 0.04, pass_td: 4, rush_yd: 0.1, rush_td: 6, rec_yd: 0.1, rec_td: 6 } };
     // NFL opponents: rotate the teams each week (teams on bye still get a listed opponent; harmless)
@@ -727,9 +839,36 @@
       return { player_id: p.player_id, player: pl, team: p.team, opponent: bye[p.team] === w ? null : nflOpp(p.team, w), stats: { pts_ppr: Math.round(v * 10) / 10 } };
     });
     const db = Object.fromEntries(plist.map((p) => { const { _mu, ...rest } = p; return [p.player_id, rest]; }));
+    // two finished earlier seasons (league history): same managers, one new manager in 2024, made-up scores
+    const past = {};
+    for (const [yr, prev] of [["2025", "sample2024"], ["2024", null]]) {
+      const pUsers = users.map((u, i) => (yr === "2024" && i === 11 ? { user_id: "u99", display_name: "oldowner", metadata: { team_name: "Gone But Not Forgotten" } }
+        : { ...u, metadata: { team_name: `${u.metadata.team_name}${yr === "2024" ? " ’24" : " ’25"}` } }));
+      const pRosters = pUsers.map((u, i) => ({ roster_id: i + 1, owner_id: u.user_id, players: [], settings: {} }));
+      const lvl = pRosters.map(() => 105 + gauss() * 12);
+      const pm = {};
+      for (let w = 1; w <= 14; w++) {
+        const ids = pRosters.map((r) => r.roster_id).sort(() => rnd() - 0.5);
+        pm[w] = [];
+        for (let i = 0; i < ids.length; i += 2) for (const rid of [ids[i], ids[i + 1]])
+          pm[w].push({ roster_id: rid, matchup_id: i / 2 + 1, points: Math.round((lvl[rid - 1] + gauss() * 22) * 100) / 100 });
+      }
+      past["sample" + yr] = { league: { league_id: "sample" + yr, previous_league_id: prev, status: "complete", name: "Sample league", season: yr,
+        roster_positions: slots, settings: { playoff_week_start: 15, playoff_teams: 6, type: 0 }, scoring_settings: league.scoring_settings },
+        users: pUsers, rosters: pRosters, matchups: pm };
+    }
     return {
       fetchJson: async (url) => {
         let m;
+        if ((m = /\/league\/(sample20\d\d)(\/.*)?$/.exec(url))) {
+          const P = past[m[1]], rest = m[2] || "";
+          if (!P) return null;
+          if (!rest) return P.league;
+          if (rest === "/users") return P.users;
+          if (rest === "/rosters") return P.rosters;
+          if ((m = /^\/matchups\/(\d+)$/.exec(rest))) return P.matchups[+m[1]] || [];
+          return [];
+        }
         if (/\/state\/nfl$/.test(url)) return { season: "2026", season_type: "regular", week: cw };
         if (/\/rosters$/.test(url)) return rosters;
         if (/\/users$/.test(url)) return users;
@@ -749,7 +888,7 @@
   }
 
   const api = { API, POSITIONS, SLOT_ACCEPTS, TIERS, liveNet, makeSampleNet, loadLeague, computeValues, bestLineup,
-    lineupStrength, rosterValue, powerRankings, loadWeekRows, weekPoints, weeklyRankings, computeDynasty, ageFactor, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
+    lineupStrength, rosterValue, powerRankings, loadWeekRows, weekPoints, weeklyRankings, loadLeagueHistory, analyzeSeasons, computeDynasty, ageFactor, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
     settings: { BENCH_CREDIT, BENCH_COUNT, DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL, WEEKLY_PROJ, RECENT_GAMES } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SleeperCore = api;
