@@ -125,7 +125,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     <div class="toolbar"><button id="clear" type="button">Clear trade</button></div>
   </div>
   <section class="panel explain">
-    <div><b>Player value (0–100).</b> Each player's expected points for every remaining week, including your fantasy playoffs, are 65% Sleeper projection and 35% his points per game so far, scored with your league's settings. Byes and weeks he's out count as zero. Only points above replacement count, where replacement is the 3rd-best free agent at his position. That's how positional importance and ease of replacement come in: a position your lineup needs a lot of, with a thin waiver wire, is worth more. Kickers and defenses count half because they're easy to stream. Values follow a curve so one star is worth more than two average starters, and 100 is the most valuable player in the league.</div>
+    <div><b>Player value (0–100).</b> What he's done and what he's projected to do: his weekly rate is 50% points per game so far and 50% Sleeper's projected points per game for the rest of the season, including your fantasy playoffs, all scored with your league's settings. Players with fewer than six games lean more on the projection. A bye week is a small penalty (it counts as 80% of a week), while weeks he's projected out count as zero. Only points above replacement count, where replacement is the 3rd-best free agent at his position. That's how positional importance and ease of replacement come in: a position your lineup needs a lot of, with a thin waiver wire, is worth more. Kickers and defenses count half because they're easy to stream. Values follow a curve so one star is worth more than two average starters, and 100 is the most valuable player in the league.</div>
     <div><b>The bar.</b> Each side's total value counts the best player fully and each extra player for less (85%, 72%, 62%…), since you can only start so many. The difference sets the bar: within 8% is an even trade, 8–20% slightly favors one team, 20–38% favors them, and more than that is a fleecing.</div>
     <div><b>Lineup change</b> is how much each team's best starting lineup gains or loses per week for the rest of the season. A trade can be even on value and still help both teams. If a team takes back more players than it sends, it has to drop its lowest-value players.</div>
   </section>
@@ -142,7 +142,6 @@ let B = null, V = null;
 const S = { a: { rid: null, give: [], pos: "ALL" }, b: { rid: null, give: [], pos: "ALL" } };
 const other = (k) => (k === "a" ? "b" : "a");
 const team = (rid) => B.teams.find((t) => t.rid === rid);
-const nW = () => B.remaining.length || 1;
 
 function sideHtml(k) {
   const s = S[k];
@@ -150,7 +149,7 @@ function sideHtml(k) {
   return `<label class="f" for="team-${k}">${k === "a" ? "Left" : "Right"} team</label><select id="team-${k}" data-k="${k}">${opts}</select>
     <h2 id="sends-${k}"></h2><div class="chips" id="chips-${k}"></div>
     <div class="filters" id="filt-${k}">${["ALL", ...SleeperCore.POSITIONS].map((p) => `<button type="button" data-pos="${p}" aria-pressed="${p === s.pos}">${p === "ALL" ? "All" : p}</button>`).join("")}</div>
-    <div class="roster"><table><thead><tr><th></th><th>Player</th><th title="Trade value, 0-100">Value</th><th title="Points per game so far">PPG</th><th title="Expected points per remaining week">Proj/wk</th></tr></thead><tbody id="roster-${k}"></tbody></table></div>`;
+    <div class="roster"><table><thead><tr><th></th><th>Player</th><th title="Trade value, 0-100">Value</th><th title="Points per game so far">PPG</th><th title="Sleeper projected points per game, rest of season">Proj</th></tr></thead><tbody id="roster-${k}"></tbody></table></div>`;
 }
 function injBadge(st) {
   if (!st) return "";
@@ -169,11 +168,12 @@ function drawSide(k) {
     .filter((p) => s.pos === "ALL" || p.pos === s.pos).sort((x, y) => y.value - x.value || y.ros - x.ros);
   $("roster-" + k).innerHTML = list.map((p) => {
     const sel = s.give.includes(p.pid);
-    const tags = [p.nfl, p.posRank ? `${p.pos}${p.posRank}` : "", t.taxi.has(p.pid) ? "taxi" : "", t.reserve.has(p.pid) ? "IR slot" : ""].filter(Boolean).join(" · ");
+    const tags = [p.nfl, p.posRank ? `${p.pos}${p.posRank}` : "", p.byeWeeks && p.byeWeeks.length ? `bye wk ${p.byeWeeks.join(", ")}` : "",
+      t.taxi.has(p.pid) ? "taxi" : "", t.reserve.has(p.pid) ? "IR slot" : ""].filter(Boolean).join(" · ");
     return `<tr class="p${sel ? " sel" : ""}" data-k="${k}" data-pid="${esc(p.pid)}" tabindex="0" aria-pressed="${sel}">
       <td class="ck"><input type="checkbox"${sel ? " checked" : ""} tabindex="-1" aria-hidden="true"></td>
       <td class="pn"><span class="pos ${esc(p.pos)}">${esc(p.pos)}</span>${esc(p.name)}${injBadge(p.injury)}<small>${esc(tags)}</small></td>
-      <td class="v">${p.value.toFixed(1)}</td><td>${p.games ? p.ppg.toFixed(1) : "--"}</td><td>${(p.ros / nW()).toFixed(1)}</td></tr>`;
+      <td class="v">${p.value.toFixed(1)}</td><td>${p.games ? p.ppg.toFixed(1) : "--"}</td><td>${p.projPg ? p.projPg.toFixed(1) : "--"}</td></tr>`;
   }).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted)">No players at this position.</td></tr>`;
 }
 function drawBar() {

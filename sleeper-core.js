@@ -11,8 +11,9 @@
     FLEX: ["RB", "WR", "TE"], WRRB_FLEX: ["RB", "WR"], REC_FLEX: ["WR", "TE"], SUPER_FLEX: ["QB", "RB", "WR", "TE"],
   };
   // tuning (explained on the pages)
-  const PROJ_WEIGHT = 0.65;     // weekly expectation = 65% Sleeper projection + 35% points per game so far
-  const MIN_GAMES = 3;          // fewer games than this: projection only
+  const DONE_WEIGHT = 0.5;      // weekly rate = 50% points per game so far + 50% projected points per game
+  const FULL_GAMES = 6;         // ...once he has this many games; fewer games lean on the projection
+  const BYE_CREDIT = 0.8;       // a bye week still counts 80% of a week (small penalty); weeks out count 0
   const WAIVER_RANK = 3;        // replacement level = 3rd best free agent at the position
   const STAR_POWER = 1.5;       // value curve: one great player beats two good ones
   const STREAM_DISCOUNT = { K: 0.5, DEF: 0.5 };   // easy to stream and hard to project: count half
@@ -192,6 +193,16 @@
       }
     }
     const haveProj = remaining.some((w) => Object.keys(projW[w]).length);
+    // which NFL teams play each remaining week (anyone on the team projected) -> bye vs injured
+    const teamPlays = {};
+    for (const w of remaining) {
+      teamPlays[w] = new Set();
+      for (const r of proj[w] || []) {
+        const pid = String(r.player_id || (r.player && r.player.player_id) || "");
+        const tm = r.team || (r.player && r.player.team) || (info(pid) || {}).team;
+        if (tm && projW[w][pid] > 0) teamPlays[w].add(String(tm).toUpperCase());
+      }
+    }
     const players = {};
     for (const pid of pids) {
       const inf = info(pid);
@@ -199,35 +210,44 @@
       if (!pos) continue;
       const g = games[pid] || 0;
       const ppg = g ? tot[pid] / g : 0;
-      const weekly = remaining.map((w) => {
-        if (w === cw && livePts[pid] !== undefined) return 0;      // already played this week
-        const p = projW[w][pid] || 0;
-        if (!haveProj) return ppg;
-        if (p <= 0) return 0;                                        // bye, injured or out
-        return g >= MIN_GAMES ? PROJ_WEIGHT * p + (1 - PROJ_WEIGHT) * ppg : p;
+      const nfl = String(inf.team || (pos === "DEF" ? pid : "")).toUpperCase();
+      // each remaining week: played (already this week), bye, out (team plays, he is projected 0) or on
+      const status = remaining.map((w) => {
+        if (w === cw && livePts[pid] !== undefined) return "played";
+        if (!haveProj) return "on";
+        if ((projW[w][pid] || 0) > 0) return "on";
+        return nfl && teamPlays[w].size > 20 && !teamPlays[w].has(nfl) ? "bye" : "out";
       });
+      const onProj = remaining.map((w, i) => (status[i] === "on" ? projW[w][pid] || 0 : 0)).filter((x) => x > 0);
+      const projPg = onProj.length ? onProj.reduce((a, x) => a + x, 0) / onProj.length : 0;
+      const wDone = !haveProj ? 1 : g ? DONE_WEIGHT * Math.min(1, g / FULL_GAMES) : 0;
+      const rate = !haveProj ? ppg : onProj.length ? wDone * ppg + (1 - wDone) * projPg : 0;
+      const weekly = status.map((st) => (st === "on" ? rate : 0));
+      const counted = status.filter((x) => x !== "played").length;
+      const on = status.filter((x) => x === "on").length, byes = status.filter((x) => x === "bye").length;
+      const avail = counted ? (on + BYE_CREDIT * byes) / counted : 1;
       const name = inf.full_name || [inf.first_name, inf.last_name].filter(Boolean).join(" ") || (pos === "DEF" ? `${pid} D/ST` : pid);
       players[pid] = { pid, name, pos, nfl: inf.team || (pos === "DEF" ? pid : ""), injury: inf.injury_status || "",
-        owner: owner[pid] || null, ppg, games: g, total: tot[pid] || 0, weekly,
+        owner: owner[pid] || null, ppg, games: g, total: tot[pid] || 0, weekly, rate, projPg, avail,
+        byeWeeks: remaining.filter((w, i) => status[i] === "bye"), outWeeks: remaining.filter((w, i) => status[i] === "out"),
         ros: weekly.reduce((s, x) => s + x, 0), live: livePts[pid] };
     }
     // replacement level: what you could pick up off waivers right now (avg weekly pts)
     const repl = {};
-    const nW = remaining.length || 1;
     for (const pos of POSITIONS) {
-      const fa = Object.values(players).filter((p) => p.pos === pos && !p.owner).map((p) => remaining.length ? p.ros / nW : p.ppg).sort((a, b) => b - a);
+      const fa = Object.values(players).filter((p) => p.pos === pos && !p.owner).map((p) => p.rate * p.avail).sort((a, b) => b - a);
       repl[pos] = fa[WAIVER_RANK - 1] || fa[fa.length - 1] || 0;
     }
     let maxRaw = 0;
     for (const p of Object.values(players)) {
-      p.vor = remaining.length ? p.weekly.reduce((s, x) => s + (x > 0 ? Math.max(0, x - repl[p.pos]) : 0), 0) : Math.max(0, p.ppg - repl[p.pos]);
+      p.vor = Math.max(0, p.rate - repl[p.pos]) * p.avail;   // points above waivers per week, times availability
       p.vor *= STREAM_DISCOUNT[p.pos] || 1;
       maxRaw = Math.max(maxRaw, p.vor);
     }
     for (const p of Object.values(players)) p.value = maxRaw > 0 ? 100 * Math.pow(p.vor / maxRaw, STAR_POWER) : 0;
     // positional ranks by value
     for (const pos of POSITIONS) {
-      Object.values(players).filter((p) => p.pos === pos).sort((a, b) => b.value - a.value || b.ros - a.ros).forEach((p, i) => { p.posRank = i + 1; });
+      Object.values(players).filter((p) => p.pos === pos).sort((a, b) => b.value - a.value || b.rate - a.rate).forEach((p, i) => { p.posRank = i + 1; });
     }
     return { players, repl, haveProj };
   }
@@ -449,7 +469,7 @@
 
   const api = { API, POSITIONS, SLOT_ACCEPTS, TIERS, liveNet, makeSampleNet, loadLeague, computeValues, bestLineup,
     lineupStrength, powerRankings, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
-    settings: { PROJ_WEIGHT, MIN_GAMES, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
+    settings: { DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SleeperCore = api;
 })(typeof self !== "undefined" ? self : this);
