@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trade Calculator | Sleeper Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2f4;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#5b6f7c;--line:#d6dee3;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;--display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:40px;line-height:1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:64ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row .grow{flex:2 1 260px}.row .sm{flex:1 1 130px}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-size:22px;letter-spacing:.03em;font-weight:600;padding:6px 32px}
+button:disabled{opacity:.6;cursor:progress}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.banner{border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:8px}
+.banner.error{background:var(--bad-bg);color:var(--bad-ink)}
+.banner.note{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.banner.sample{background:var(--warn-bg);color:var(--warn-ink)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;font-weight:600;white-space:nowrap}
+th:nth-child(1),th:nth-child(2),td:nth-child(1),td:nth-child(2){text-align:left}
+td{padding:9px 10px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+td.tm{font-weight:600}
+td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
+tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+/* trade bar */
+.tradebar{position:sticky;top:0;z-index:5;box-shadow:0 6px 18px -12px rgba(0,0,0,.35)}
+@media(max-width:820px){.tradebar{padding:10px 12px}.tradebar .zones{display:none}.tradebar .ends{margin-top:6px;font-size:13px}
+  .tradebar .sums{gap:6px;margin-top:6px}.tradebar .sum{padding:5px 8px;font-size:12px;line-height:1.3}.tradebar .sum b{font-size:18px}.tradebar .sum .drop{font-size:11px}
+  .verdict{font-size:24px;margin-bottom:8px}.verdict.muted{font-size:18px}.marker{width:24px;height:24px;margin:-12px 0 0 -12px;border-width:3px}.bar{height:14px}}
+.verdict{font-family:var(--display);font-size:34px;font-weight:700;line-height:1;text-align:center;margin:2px 0 12px;text-wrap:balance}
+.verdict.muted{color:var(--muted);font-size:26px}
+.bar{position:relative;height:18px;margin:0 12px}
+.track{position:absolute;inset:0;border-radius:99px;opacity:.9;
+  background:linear-gradient(90deg,#c0392b 0 12%,#e08a1e 12% 30%,#c9b521 30% 42%,#2e9e5b 42% 58%,#c9b521 58% 70%,#e08a1e 70% 88%,#c0392b 88% 100%)}
+.marker{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--surface);border:4px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.35);transition:left .45s cubic-bezier(.3,1.3,.5,1)}
+.zones{display:grid;grid-template-columns:12% 18% 12% 16% 12% 18% 12%;margin:8px 12px 0;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:center}
+.ends{display:flex;justify-content:space-between;gap:12px;margin-top:10px;font-weight:600}
+.ends span{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sums{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.sum{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+.sum b{font-family:var(--display);font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.sum .d{font-weight:600}.d.pos{color:#1f8a4c}.d.neg{color:#c0392b}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .d.pos{color:#4fd18b}:root:not([data-theme="light"]) .d.neg{color:#ff8a7a}}
+.sum .drop{color:var(--muted);font-size:13px;margin-top:2px}
+/* sides */
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.sides{grid-template-columns:1fr}}
+.side h2{font-family:var(--display);font-size:22px;margin:14px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-height:36px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--ink);border-radius:99px;padding:4px 6px 4px 10px;font-size:14px;font-weight:600;min-height:32px}
+.chip button{min-height:24px;width:24px;padding:0;border-radius:50%;border:0;background:transparent;font-size:16px;line-height:1;color:var(--muted)}
+.chips .empty{color:var(--muted);font-size:14px}
+.filters{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0 4px}
+.filters button{min-height:34px;padding:4px 10px;font-size:13px;font-weight:600}
+.filters button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.roster{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.roster table th{position:sticky;top:0;background:var(--surface);z-index:1}
+.roster tr.p{cursor:pointer}
+.roster tr.p:hover td{background:var(--surface-2)}
+.roster tr.sel td{background:color-mix(in srgb,var(--accent-soft) 70%,transparent)}
+.roster td.ck{width:34px;padding-right:0}
+.roster input{width:18px;height:18px;accent-color:var(--accent);pointer-events:none}
+.roster td.pn{white-space:normal;text-align:left;font-weight:600}
+.roster td.pn small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.pos{display:inline-block;min-width:34px;text-align:center;font-size:11px;font-weight:700;border-radius:4px;padding:2px 4px;margin-right:6px;color:#fff;vertical-align:1px}
+.pos.QB{background:#c2410c}.pos.RB{background:#0f766e}.pos.WR{background:#1d4ed8}.pos.TE{background:#7c3aed}.pos.K{background:#6b7280}.pos.DEF{background:#4b5563}
+.inj{font-size:11px;font-weight:700;color:var(--bad-ink);background:var(--bad-bg);border-radius:4px;padding:1px 5px;margin-left:4px}
+.inj.q{color:var(--warn-ink);background:var(--warn-bg)}
+.roster td.v{font-family:var(--display);font-size:20px;font-weight:700}
+.roster th:nth-child(2),.roster td:nth-child(2){text-align:left}
+.toolbar{display:flex;justify-content:center;margin-top:12px}
+</style>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="trade.html" aria-current="page">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>Trade Calculator</h1>
+    <p class="sub">Load your league, pick two teams, and tap players to build a trade. Values use your league's scoring, rest-of-season projections and how hard each player is to replace.</p>
+  </header>
+  <section class="panel" aria-label="League">
+    <div class="row">
+      <div class="grow"><label class="f" for="leagueId">Sleeper league ID</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="run" class="primary" type="button">Load league</button>
+      <button id="demo" type="button">Use sample data</button>
+    </div>
+  </section>
+  <section id="status" aria-live="polite"></section>
+  <div id="app" hidden>
+    <section class="panel tradebar" aria-label="Trade verdict">
+      <div class="verdict muted" id="verdict" aria-live="polite">Tap players on both sides to build a trade</div>
+      <div class="bar" role="img" id="barImg" aria-label="Trade balance"><div class="track"></div><div class="marker" id="marker"></div></div>
+      <div class="zones" aria-hidden="true"><span>Fleece</span><span>Favors</span><span>Slight</span><span>Even</span><span>Slight</span><span>Favors</span><span>Fleece</span></div>
+      <div class="ends"><span id="endA"></span><span id="endB"></span></div>
+      <div class="sums"><div class="sum" id="sumA"></div><div class="sum" id="sumB"></div></div>
+    </section>
+    <div class="sides">
+      <section class="panel side" data-side="a" aria-label="Left team"></section>
+      <section class="panel side" data-side="b" aria-label="Right team"></section>
+    </div>
+    <div class="toolbar"><button id="clear" type="button">Clear trade</button></div>
+  </div>
+  <section class="panel explain">
+    <div><b>Player value (0–100).</b> Each player's expected points for every remaining week, including your fantasy playoffs, are 65% Sleeper projection and 35% his points per game so far, scored with your league's settings. Byes and weeks he's out count as zero. Only points above replacement count, where replacement is the 3rd-best free agent at his position. That's how positional importance and ease of replacement come in: a position your lineup needs a lot of, with a thin waiver wire, is worth more. Kickers and defenses count half because they're easy to stream. Values follow a curve so one star is worth more than two average starters, and 100 is the most valuable player in the league.</div>
+    <div><b>The bar.</b> Each side's total value counts the best player fully and each extra player for less (85%, 72%, 62%…), since you can only start so many. The difference sets the bar: within 8% is an even trade, 8–20% slightly favors one team, 20–38% favors them, and more than that is a fleecing.</div>
+    <div><b>Lineup change</b> is how much each team's best starting lineup gains or loses per week for the rest of the season. A trade can be even on value and still help both teams. If a team takes back more players than it sends, it has to drop its lowest-value players.</div>
+  </section>
+</div>
+<script src="sleeper-core.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
+
+let B = null, V = null;
+const S = { a: { rid: null, give: [], pos: "ALL" }, b: { rid: null, give: [], pos: "ALL" } };
+const other = (k) => (k === "a" ? "b" : "a");
+const team = (rid) => B.teams.find((t) => t.rid === rid);
+const nW = () => B.remaining.length || 1;
+
+function sideHtml(k) {
+  const s = S[k];
+  const opts = B.teams.map((t) => `<option value="${t.rid}"${t.rid === s.rid ? " selected" : ""}>${esc(t.name)}</option>`).join("");
+  return `<label class="f" for="team-${k}">${k === "a" ? "Left" : "Right"} team</label><select id="team-${k}" data-k="${k}">${opts}</select>
+    <h2 id="sends-${k}"></h2><div class="chips" id="chips-${k}"></div>
+    <div class="filters" id="filt-${k}">${["ALL", ...SleeperCore.POSITIONS].map((p) => `<button type="button" data-pos="${p}" aria-pressed="${p === s.pos}">${p === "ALL" ? "All" : p}</button>`).join("")}</div>
+    <div class="roster"><table><thead><tr><th></th><th>Player</th><th title="Trade value, 0-100">Value</th><th title="Points per game so far">PPG</th><th title="Expected points per remaining week">Proj/wk</th></tr></thead><tbody id="roster-${k}"></tbody></table></div>`;
+}
+function injBadge(st) {
+  if (!st) return "";
+  const q = /quest/i.test(st);
+  const short = { Questionable: "Q", Doubtful: "D", Out: "OUT", IR: "IR", PUP: "PUP", Sus: "SUS" }[st] || st.toUpperCase().slice(0, 4);
+  return `<span class="inj${q ? " q" : ""}" title="${esc(st)}">${esc(short)}</span>`;
+}
+function drawSide(k) {
+  const s = S[k], t = team(s.rid);
+  $("sends-" + k).textContent = `${t.name} sends`;
+  $("chips-" + k).innerHTML = s.give.length ? s.give.map((pid) => {
+    const p = V.players[pid] || { name: pid, value: 0 };
+    return `<span class="chip">${esc(p.name)} <small>${p.value.toFixed(1)}</small><button type="button" data-k="${k}" data-rm="${esc(pid)}" aria-label="Remove ${esc(p.name)}">×</button></span>`;
+  }).join("") : `<span class="empty">Nobody yet. Tap players below.</span>`;
+  const list = t.players.map((pid) => V.players[pid] || { pid, name: pid, pos: "?", value: 0, ppg: 0, ros: 0, nfl: "", injury: "" })
+    .filter((p) => s.pos === "ALL" || p.pos === s.pos).sort((x, y) => y.value - x.value || y.ros - x.ros);
+  $("roster-" + k).innerHTML = list.map((p) => {
+    const sel = s.give.includes(p.pid);
+    const tags = [p.nfl, p.posRank ? `${p.pos}${p.posRank}` : "", t.taxi.has(p.pid) ? "taxi" : "", t.reserve.has(p.pid) ? "IR slot" : ""].filter(Boolean).join(" · ");
+    return `<tr class="p${sel ? " sel" : ""}" data-k="${k}" data-pid="${esc(p.pid)}" tabindex="0" aria-pressed="${sel}">
+      <td class="ck"><input type="checkbox"${sel ? " checked" : ""} tabindex="-1" aria-hidden="true"></td>
+      <td class="pn"><span class="pos ${esc(p.pos)}">${esc(p.pos)}</span>${esc(p.name)}${injBadge(p.injury)}<small>${esc(tags)}</small></td>
+      <td class="v">${p.value.toFixed(1)}</td><td>${p.games ? p.ppg.toFixed(1) : "--"}</td><td>${(p.ros / nW()).toFixed(1)}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted)">No players at this position.</td></tr>`;
+}
+function drawBar() {
+  const ta = team(S.a.rid), tb = team(S.b.rid);
+  $("endA").textContent = `◀ ${ta.name}`; $("endB").textContent = `${tb.name} ▶`;
+  const e = SleeperCore.evaluateTrade(B, V, S.a.rid, S.b.rid, S.a.give, S.b.give);
+  const winner = e.lean > 0 ? ta.name : tb.name, loser = e.lean > 0 ? tb.name : ta.name;
+  const v = $("verdict");
+  v.className = "verdict" + (e.level === "empty" ? " muted" : "");
+  v.textContent = { empty: "Tap players on both sides to build a trade", even: "Even trade", slight: `Slightly favors ${winner}`,
+    favors: `Favors ${winner}`, fleece: `${winner} is fleecing ${loser}` }[e.level];
+  const off = Math.sign(e.lean) * Math.min(1, Math.abs(e.lean) / 0.5) * 50;      // favored team's side
+  $("marker").style.left = `${50 - off}%`;
+  $("barImg").setAttribute("aria-label", v.textContent);
+  const sum = (t, gets, imp) => {
+    const d = imp.delta, cls = d > 0.05 ? "pos" : d < -0.05 ? "neg" : "";
+    return `<div>${esc(t.name)} gets <b>${gets.toFixed(1)}</b> value</div>
+      <div>Starting lineup: <span class="d ${cls}">${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)} pts/wk</span></div>
+      ${imp.drops.length ? `<div class="drop">Must drop: ${imp.drops.map(esc).join(", ")}</div>` : ""}`;
+  };
+  $("sumA").innerHTML = sum(ta, e.aGet, e.a); $("sumB").innerHTML = sum(tb, e.bGet, e.b);
+}
+function drawAll() { drawSide("a"); drawSide("b"); drawBar(); }
+function start(sample) {
+  $("app").hidden = false;
+  document.querySelectorAll(".side").forEach((el) => {
+    const k = el.dataset.side;
+    el.innerHTML = sideHtml(k);
+  });
+  drawAll();
+  const notes = B.notes.slice();
+  if (sample) notes.unshift("Sample data. These are made-up teams and players so you can try it. Enter your league ID and press Load league for your real league.");
+  status(sample ? "sample" : notes.length ? "note" : "", notes.join(" "));
+}
+document.addEventListener("change", (e) => {
+  const k = e.target.dataset && e.target.dataset.k;
+  if (!k || !e.target.id.startsWith("team-")) return;
+  const rid = +e.target.value;
+  if (rid === S[other(k)].rid) { S[other(k)].rid = S[k].rid; S[other(k)].give = []; $("team-" + other(k)).value = S[k].rid; }
+  S[k].rid = rid; S[k].give = [];
+  drawAll();
+});
+function toggle(k, pid) {
+  const g = S[k].give, i = g.indexOf(pid);
+  if (i >= 0) g.splice(i, 1); else g.push(pid);
+  drawSide(k); drawBar();
+}
+document.addEventListener("click", (e) => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm) { toggle(rm.dataset.k, rm.dataset.rm); return; }
+  const f = e.target.closest(".filters button");
+  if (f) { const k = f.closest(".side").dataset.side; S[k].pos = f.dataset.pos; f.parentElement.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === f)); drawSide(k); return; }
+  const row = e.target.closest("tr.p");
+  if (row) toggle(row.dataset.k, row.dataset.pid);
+});
+document.addEventListener("keydown", (e) => {
+  const row = e.target.closest && e.target.closest("tr.p");
+  if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(row.dataset.k, row.dataset.pid); }
+});
+$("clear").addEventListener("click", () => { S.a.give = []; S.b.give = []; drawAll(); });
+async function go(sample) {
+  const id = $("leagueId").value.trim();
+  if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Load league."); return; }
+  if (!sample) store.set("oddsLeague", id);
+  $("run").disabled = $("demo").disabled = true;
+  try {
+    const net = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
+    B = await SleeperCore.loadLeague(net, sample ? "sample" : id, (t) => status("note", t));
+    V = SleeperCore.computeValues(B);
+    if (B.teams.length < 2) throw new Error("This league needs at least two teams.");
+    S.a = { rid: B.teams[0].rid, give: [], pos: "ALL" }; S.b = { rid: B.teams[1].rid, give: [], pos: "ALL" };
+    start(sample);
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);
+  } finally { $("run").disabled = $("demo").disabled = false; }
+}
+$("run").addEventListener("click", () => go(false));
+$("demo").addEventListener("click", () => go(true));
+$("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
+</script>
+</body>
+</html>

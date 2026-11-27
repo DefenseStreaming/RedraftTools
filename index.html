@@ -10,7 +10,7 @@
 .wrap{max-width:900px;margin:0 auto;padding:32px 16px 48px;display:flex;flex-direction:column;gap:24px}
 h1{font-family:var(--display);font-size:52px;line-height:1;margin:0;text-wrap:balance}
 p.lede{color:var(--muted);font-size:18px;max-width:60ch;margin:8px 0 0}
-.cards{display:grid;gap:14px;grid-template-columns:1fr}@media(min-width:760px){.cards{grid-template-columns:repeat(3,1fr)}}
+.cards{display:grid;gap:14px;grid-template-columns:1fr}@media(min-width:760px){.cards{grid-template-columns:repeat(2,1fr)}}
 .card{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;color:inherit;text-decoration:none}
 a.card:hover{border-color:var(--accent)}a.card:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .card h2{font-family:var(--display);font-size:30px;margin:0}.card p{margin:0;color:var(--muted);font-size:15px}
@@ -22,7 +22,8 @@ footer{color:var(--muted);font-size:13px}
 <header><h1>Sleeper Tools</h1><p class="lede">Fantasy football tools that use your own league's scoring and settings. Enter a Sleeper league ID and go.</p></header>
 <section class="cards" aria-label="Tools">
 <a class="card" href="defense.html"><span class="tag">Live</span><h2>Defense Streamer</h2><p>Ranks every defense for the next three weeks using your league's defense scoring.</p></a>
-<div class="card off"><span class="tag soon">Coming soon</span><h2>Power Rankings</h2><p>Record, points for and roster strength combined into one weekly ranking.</p></div>
+<a class="card" href="power.html"><span class="tag">Live</span><h2>Power Rankings</h2><p>Record 50%, points for 30% and roster strength 20%, with tiers and weekly movement.</p></a>
+<a class="card" href="trade.html"><span class="tag">New</span><h2>Trade Calculator</h2><p>Pick two teams and build a trade. A live bar shows if it's even, lopsided or a fleecing.</p></a>
 <a class="card" href="odds.html"><span class="tag">Live</span><h2>Playoff Odds</h2><p>Full simulation with lineups, injuries and byes. Enter your league ID and press Run.</p></a>
 </section>
 <footer>Not affiliated with Sleeper or the NFL. Data comes from Sleeper's public feeds.</footer>
