@@ -847,10 +847,22 @@ def build_strength_model(teams, lineups, args, roster_z=None):
     return mean_out, sd_out, info
 
 
-def build_live(rows, teams, feed, level_mean, lineups, final=False):
+OUT_STATUSES = ("out", "ir", "pup", "nfi", "dnr", "sus", "cov")
+
+
+def ruled_out(info):
+    """True when Sleeper lists the player as not playing (Out, IR, PUP, suspended...)."""
+    inj = str((info or {}).get("injury_status") or "").strip().lower()
+    status = str((info or {}).get("status") or "").strip().lower()
+    return inj in OUT_STATUSES or "injured reserve" in status or "suspend" in status
+
+
+def build_live(rows, teams, feed, level_mean, lineups, final=False, players_db=None):
     """Mid-week scoring. Starters who already scored count as played (their points are
-    locked in). Starters still at zero are assumed unplayed and contribute their projection.
+    locked in). Starters still at zero are assumed unplayed and contribute their projection,
+    unless Sleeper lists them as Out/IR/suspended (ruled out before or during the game).
     Returns {roster_id: (points_so_far, projected_remaining, fraction_of_week_remaining)}."""
+    db = players_db or {}
     raw = {}
     for row in rows:
         rid = int(row.get("roster_id", -1))
@@ -859,7 +871,9 @@ def build_live(rows, teams, feed, level_mean, lineups, final=False):
         starters = [str(x) for x in (row.get("starters") or [])]
         sp = [num(x) for x in (row.get("starters_points") or [])]
         unplayed = [pid for pid, pt in zip(starters, sp) if pid not in ("0", "", "None") and pt == 0]
-        raw[rid] = (sum(sp), unplayed, max(1, len(starters)))
+        n = max(1, len(starters))
+        unplayed = [pid for pid in unplayed if not ruled_out(db.get(pid))]   # ruled out: nothing more to add
+        raw[rid] = (sum(sp), unplayed, n)
     if not raw or sum(v[0] for v in raw.values()) <= 0:
         return {}
     have_feed = bool(feed) and len(feed) >= 150
@@ -1188,6 +1202,7 @@ def run_league(args, quiet=False):
 
     rng = random.Random(args.seed)
     lineups, diag = {}, {}
+    players_db = {}
     if weeks and not args.no_projections:
         try:
             players_db = load_players_db(cache_dir, args.refresh_players)
@@ -1220,7 +1235,7 @@ def run_league(args, quiet=False):
     live = {}
     if weeks and not args.no_live:
         lv = build_live(rows_by_week.get(weeks[0], []), teams, week_feeds.get(weeks[0]), level_mean, lineups,
-                        final=args.week_final)
+                        final=args.week_final, players_db=players_db)
         if lv:
             live = {weeks[0]: lv}
             nm = lambda r: teams[r]["name"][:16]
@@ -1810,6 +1825,15 @@ def _selftest():
             {"roster_id": 2, "starters": ["a", "b"], "starters_points": [0.0, 0.0]}]
     assert build_live(rows, {1: {}, 2: {}}, None, {1: 100.0, 2: 100.0}, {})[1][0] == 20.0
     assert build_live([rows[1]], {2: {}}, None, {2: 100.0}, {}) == {}
+    # ruled out with 0 points (before or during the game): nothing projected for him
+    feed = {f"p{i}": 10.0 for i in range(200)}
+    lr = [{"roster_id": 1, "starters": ["p1", "p2", "p3"], "starters_points": [20.0, 0.0, 0.0]},
+          {"roster_id": 2, "starters": ["p4"], "starters_points": [5.0]}]
+    lt = {1: {}, 2: {}}
+    assert build_live(lr, lt, feed, {1: 100.0, 2: 100.0}, {})[1][:2] == (20.0, 20.0)
+    outdb = {"p2": {"injury_status": "Out"}, "p3": {"injury_status": "Questionable"}}
+    assert build_live(lr, lt, feed, {1: 100.0, 2: 100.0}, {}, players_db=outdb)[1][:2] == (20.0, 10.0)
+    assert ruled_out({"status": "Injured Reserve"}) and not ruled_out({"injury_status": "Questionable"})
     assert build_live(rows, {1: {}, 2: {}}, None, {1: 100.0, 2: 100.0}, {}, final=True)[1] == (20.0, 0.0, 0.0)
     # power rankings: weights, scaling, dropped component
     st = {1: {"win": 0.9, "pf": 140.0, "roster": 130.0}, 2: {"win": 0.5, "pf": 125.0, "roster": 125.0},
