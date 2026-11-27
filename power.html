@@ -119,37 +119,44 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   th{font-size:8pt;white-space:normal;padding:4px 5px;vertical-align:bottom}
   td{padding:4px 5px;font-size:9.5pt}td.tm{white-space:normal}td.last{font-size:16pt}
 }
-.ptiers{display:none}
-#printChart{display:none}
+/* ---------- PDF document: three fixed-shape pages, sized as a share of the page width ----------
+   Safari on iPhone lays out at phone width and scales to the paper, so inch sizes are unreliable.
+   Each .pg keeps a letter-like shape (aspect-ratio) and everything inside uses cqw (1% of page width),
+   so whatever the browser's scale, every page fills exactly one sheet. */
+#pdfDoc{display:none}
 @media print{
-  .meta,.legend,#tblPanel,.printfoot{display:none!important}
-  /* page 1: tiles, tier banner on top, one full page */
-  .tiles{grid-template-columns:repeat(3,1fr);grid-auto-rows:2.02in;gap:8px}
-  .tile{position:relative;break-inside:avoid}
-  .tile .tier{order:-1;margin-top:0;font-size:15px;padding:8px 12px;white-space:nowrap;overflow:hidden}
-  .tile .top{flex:1;padding:10px 12px 6px}
-  .tile .sc{position:absolute;right:12px;bottom:10px;margin:0}
-  .tile .rk{font-size:44px}.tile .nm{font-size:22px;overflow-wrap:normal;word-break:normal}.tile .sc b{font-size:30px}.tile .sub2{font-size:12px}
-  button.tier::after{display:none}
-  /* page 2: tier guide */
-  .ptiers{display:flex!important;flex-direction:column;gap:8px;break-before:page;height:8.95in}
-  .ptiers h2{font-family:var(--display);font-size:28px;margin:0;border-bottom:3px solid var(--accent);padding-bottom:4px}
-  .ptier{flex:1;display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;break-inside:avoid}
-  .ptier .pt-band{flex:none;width:2.1in;color:#fff;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px}
-  .ptier .pt-band b{font-family:var(--display);font-size:22px;line-height:1.05;text-transform:uppercase}
-  .ptier .pt-band span{font-size:12px;opacity:.9}
-  .ptier .pt-body{padding:10px 14px;display:flex;flex-direction:column;justify-content:center;gap:6px}
-  .ptier .pt-body p{margin:0;font-size:11.5pt}
-  .ptier .pt-teams{color:var(--muted);font-size:10pt}
-  .ptiers .pt-note{font-size:9.5pt;color:var(--muted);margin:2px 0 0}
-  /* page 3: history graph, full page */
-  #history{break-before:page;padding:8px 10px;break-inside:avoid}
-  #history h2{font-size:28px;border-bottom:3px solid var(--accent);padding-bottom:4px;margin-bottom:6px}
-  #chartbox{display:none!important}
-  #printChart{display:block!important}
-  #printChart svg{width:100%!important;height:7.9in!important}
-  .picks,#history details,#histLede{display:none!important}
-  .chartbox text.tierlbl{text-decoration:none}
+  body>*:not(#pdfDoc){display:none!important}
+  #pdfDoc{display:block!important}
+  .pg{width:100%;aspect-ratio:79/100;container-type:inline-size;display:flex;flex-direction:column;overflow:hidden;
+    break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid;background:#fff;color:#0f2230;font-family:var(--body)}
+  .pg:last-child{break-after:auto;page-break-after:auto}
+  .pg-head{flex:none;display:flex;justify-content:space-between;align-items:flex-end;gap:2cqw;border-bottom:.45cqw solid #0d6b4d;padding-bottom:.8cqw;margin-bottom:1.5cqw}
+  .pg-title{font-family:var(--display);font-size:4.6cqw;font-weight:700;line-height:1}
+  .pg-sub{font-size:1.55cqw;color:#4f6370;text-align:right;line-height:1.35}.pg-sub b{color:#0f2230}
+  /* page 1 */
+  .pg-tiles{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);gap:1.2cqw}
+  .pt{position:relative;display:flex;flex-direction:column;border:.15cqw solid #cfd8de;border-radius:1.1cqw;overflow:hidden;min-height:0}
+  .pt-band{color:#fff;font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.02em;font-size:2cqw;padding:1cqw 1.5cqw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pt-main{flex:1;display:flex;gap:1.5cqw;padding:1.3cqw 1.5cqw;min-height:0}
+  .pt-rk{font-family:var(--display);font-size:6.2cqw;font-weight:700;line-height:.9;color:#0d6b4d}
+  .pt-mv{font-size:1.7cqw;font-weight:700;margin-top:.7cqw;color:#5b6f7c}.pt-mv.up{color:#1f8a4c}.pt-mv.down{color:#c0392b}
+  .pt-nm{font-family:var(--display);font-size:2.9cqw;font-weight:700;line-height:1.05}
+  .pt-rec{font-size:1.75cqw;color:#4f6370;margin-top:.5cqw}
+  .pt-sc{position:absolute;right:1.5cqw;bottom:1.2cqw;text-align:right;line-height:1}
+  .pt-sc b{display:block;font-family:var(--display);font-size:4.2cqw}.pt-sc span{font-size:1.35cqw;color:#5b6f7c;text-transform:uppercase;letter-spacing:.06em}
+  /* page 2 */
+  .pg-tiers{flex:1;min-height:0;display:flex;flex-direction:column;gap:1.1cqw}
+  .ptr{flex:1;min-height:0;display:flex;border:.15cqw solid #cfd8de;border-radius:1cqw;overflow:hidden}
+  .ptr-band{flex:none;width:27cqw;color:#fff;padding:1.5cqw 1.8cqw;display:flex;flex-direction:column;justify-content:center;gap:.5cqw}
+  .ptr-band b{font-family:var(--display);font-size:3.1cqw;line-height:1.05;text-transform:uppercase}.ptr-band span{font-size:1.55cqw;opacity:.92}
+  .ptr-body{padding:1.4cqw 2cqw;display:flex;flex-direction:column;justify-content:center;gap:.9cqw;min-width:0}
+  .ptr-body p{margin:0;font-size:2.05cqw;line-height:1.35}.ptr-teams{font-size:1.65cqw;color:#4f6370;line-height:1.35}
+  .pg-note{flex:none;font-size:1.45cqw;color:#4f6370;margin:1.3cqw 0 0;line-height:1.4}
+  /* page 3 */
+  .pg-chart{flex:1;min-height:0;overflow:hidden}
+  .pg-chart svg{display:block;width:100%!important;height:113cqw!important}
+  .pg-chart text.tierlbl{text-decoration:none}
+  .pg-chart .tip{display:none!important}
 }
 </style>
 </head>
@@ -177,13 +184,11 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
     <p class="meta" id="meta"></p>
     <div class="tiles" id="tiles"></div>
     <div class="legend" id="legend"></div>
-    <section class="ptiers" id="ptiers" aria-hidden="true"></section>
     <section class="panel viz" id="history" style="margin-top:16px" aria-label="Score history">
       <h2>Score by week</h2>
       <p class="lede" id="histLede">Each line is a team's power score after every week. Pick up to three teams to highlight, hover a week to see everyone, and tap a tier name to see what it means.</p>
       <div class="picks" id="picks"></div>
       <div class="chartbox" id="chartbox"></div>
-      <div class="chartbox" id="printChart" aria-hidden="true"></div>
       <details><summary>Show as a table</summary><div class="scroll" style="margin-top:6px"><table id="histTable"></table></div></details>
     </section>
     <div class="panel scroll" id="tblPanel"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
@@ -196,6 +201,12 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
     <div><b>Movement</b> compares with last week's rankings, rebuilt from last week's record and points with the same roster score.</div>
     <div><b>Score by week</b> rebuilds every past week from that week's record and points for, plus the roster the team actually had that week (from Sleeper's weekly lineups). Those rosters are rated by what each player has done and is projected to do this season. The last point is this week's score.</div>
   </section>
+</div>
+<div id="pdfDoc" aria-hidden="true">
+  <section class="pg"><div class="pg-head"><div class="pg-title pdf-league"></div><div class="pg-sub"><b>Power Rankings</b><br><span class="pdf-when"></span></div></div><div class="pg-tiles" id="pdfTiles"></div></section>
+  <section class="pg"><div class="pg-head"><div class="pg-title">Tier guide</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-tiers" id="pdfTiers"></div>
+    <p class="pg-note"><b>How the score works:</b> 50% record, 30% points for and 20% roster strength. Each is a z-score against the league average, weighted, then scaled so 50 is average: (weighted z + 2.5) ÷ 5 × 100. Roster strength is the best starting lineup each team can field over the next four weeks. Made with Sleeper Tools.</p></section>
+  <section class="pg"><div class="pg-head"><div class="pg-title">Score by week</div><div class="pg-sub"><b class="pdf-league"></b><br><span class="pdf-when"></span></div></div><div class="pg-chart viz chartbox" id="pdfChart"></div></section>
 </div>
 <dialog id="tierDlg" aria-labelledby="tierDlgTitle">
   <div class="band" id="tierDlgBand"><span id="tierDlgTitle"></span><button type="button" id="tierDlgClose" aria-label="Close">×</button></div>
@@ -244,7 +255,7 @@ function render(b, rows, sample) {
     <td>${rec(r)}</td><td>${r.pf.toFixed(1)}</td><td>${r.roster.toFixed(1)}</td><td>${z(r.zWin)}</td><td>${z(r.zPf)}</td><td>${z(r.zRoster)}</td><td class="last">${r.score.toFixed(1)}</td></tr>`).join("");
   $("results").hidden = false;
   drawHistory(b, rows);
-  drawPrintTiers(rows);
+  buildPdf(b, rows);
   const notes = b.notes.slice();
   if (sample) notes.unshift("Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real rankings.");
   if (!b.gp) notes.push("No games have been played yet, so every team's record and points are even.");
@@ -257,13 +268,21 @@ const last = (a) => a[a.length - 1];
 const SVGNS = "http://www.w3.org/2000/svg";
 const tierRanges = () => { const t = SleeperCore.TIERS; return t.map(([lo, n], i) => ({ name: n, lo, hi: i ? t[i - 1][0] : Infinity })); };
 let lastRows = [];
-function drawPrintTiers(rows) {
-  $("ptiers").innerHTML = `<h2>Tier guide</h2>` + tierRanges().map((t) => {
+function buildPdf(b, rows) {
+  const lname = b.league.name || "Your league";
+  const when = `Week ${b.gp} · ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
+  document.querySelectorAll("#pdfDoc .pdf-league").forEach((n) => { n.textContent = lname; });
+  document.querySelectorAll("#pdfDoc .pdf-when").forEach((n) => { n.textContent = when; });
+  const mv = (m) => m === null ? "" : m > 0 ? `<div class="pt-mv up">▲ ${m}</div>` : m < 0 ? `<div class="pt-mv down">▼ ${-m}</div>` : `<div class="pt-mv">–</div>`;
+  $("pdfTiles").innerHTML = rows.map((r) => `<div class="pt"><div class="pt-band" style="background:${TIER_COLOR[r.tier]}">${esc(r.tier)}</div>
+    <div class="pt-main"><div><div class="pt-rk">${r.rank}</div>${mv(r.move)}</div><div><div class="pt-nm">${esc(r.name)}</div><div class="pt-rec">${rec(r)} · ${r.pf.toFixed(1)} PF</div></div></div>
+    <div class="pt-sc"><b>${r.score.toFixed(1)}</b><span>Score</span></div></div>`).join("");
+  $("pdfTiers").innerHTML = tierRanges().map((t) => {
     const who = rows.filter((r) => r.tier === t.name).map((r) => `${r.rank}. ${esc(r.name)} (${r.score.toFixed(1)})`);
     const range = t.lo === -Infinity ? "Score below 30" : t.hi === Infinity ? `Score ${t.lo}+` : `Score ${t.lo}–${(t.hi - 0.1).toFixed(1)}`;
-    return `<div class="ptier"><div class="pt-band" style="background:${TIER_COLOR[t.name]}"><b>${esc(t.name)}</b><span>${range}</span></div>
-      <div class="pt-body"><p>${esc(TIER_TEXT[t.name])}</p><div class="pt-teams">${who.length ? "This week: " + who.join(" · ") : "Nobody this week."}</div></div></div>`;
-  }).join("") + `<p class="pt-note"><b>How the score works:</b> 50% record, 30% points for and 20% roster strength. Each is a z-score against the league average, weighted, then scaled so 50 is average: (weighted z + 2.5) ÷ 5 × 100. Roster strength is the best starting lineup each team can field over the next four weeks. Made with Sleeper Tools.</p>`;
+    return `<div class="ptr"><div class="ptr-band" style="background:${TIER_COLOR[t.name]}"><b>${esc(t.name)}</b><span>${range}</span></div>
+      <div class="ptr-body"><p>${esc(TIER_TEXT[t.name])}</p><div class="ptr-teams">${who.length ? "This week: " + who.join(" · ") : "Nobody this week."}</div></div></div>`;
+  }).join("");
 }
 function openTier(name) {
   const t = tierRanges().find((x) => x.name === name);
@@ -311,7 +330,7 @@ $("picks").addEventListener("click", (e) => {
 });
 function el(tag, attrs, parent) { const n = document.createElementNS(SVGNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
 // screen chart, plus a print-sized copy that is always ready (iPhone may end "printing" before the PDF is made)
-function drawBoth() { drawChart(); drawChart(760, 910, $("printChart")); }
+function drawBoth() { drawChart(); drawChart(760, 860, $("pdfChart")); }
 function drawChart(forceW, forceH, target) {
   const box = target || $("chartbox"); box.innerHTML = "";
   const { weeks, series, ranks } = H.hist;

@@ -86,11 +86,29 @@ td.out{white-space:normal;min-width:220px}
   th{font-size:8pt;white-space:normal;padding:4px 5px;vertical-align:bottom}
   td{padding:4px 5px;font-size:9.5pt}td.tm{white-space:normal}td.last{font-size:16pt}
 }
+/* PDF: one fixed-shape page sized as a share of the page width (works with Safari's print scaling) */
+#pdfDoc{display:none}
 @media print{
-  #results{break-inside:auto}#results tr{break-inside:avoid}
-  #injuries{break-inside:avoid}
-  .check{font-size:9pt}
-  tr.in td{background:color-mix(in srgb,var(--accent-soft) 70%,transparent)}
+  body>*:not(#pdfDoc){display:none!important}
+  #pdfDoc{display:block!important}
+  .pg{width:100%;aspect-ratio:79/100;container-type:inline-size;display:flex;flex-direction:column;overflow:hidden;break-inside:avoid;page-break-inside:avoid;background:#fff;color:#0f2230;font-family:var(--body)}
+  .pg-head{flex:none;display:flex;justify-content:space-between;align-items:flex-end;gap:2cqw;border-bottom:.45cqw solid #0d6b4d;padding-bottom:.8cqw;margin-bottom:1.5cqw}
+  .pg-title{font-family:var(--display);font-size:4.6cqw;font-weight:700;line-height:1}
+  .pg-sub{font-size:1.55cqw;color:#4f6370;text-align:right;line-height:1.35}.pg-sub b{color:#0f2230}
+  .pg table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  #pdfOdds{table-layout:auto}
+  #pdfOdds th{font-size:calc(var(--fs) * .78);padding:.6cqw .6cqw;white-space:normal;vertical-align:bottom;color:#4f6370}
+  #pdfOdds td{font-size:var(--fs);padding:.75cqw .6cqw;border-top:.12cqw solid #cfd8de;white-space:nowrap}
+  #pdfOdds td.tm{white-space:normal}#pdfOdds td.last{font-size:calc(var(--fs) * 1.45);color:#0d6b4d}
+  .pg tr.in td{background:#e8f5ef}
+  .pg h3{font-family:var(--display);font-size:3cqw;margin:2.2cqw 0 .6cqw}
+  .pg .inj{width:100%;border-collapse:collapse}
+  .pg .inj th{font-size:1.2cqw;padding:.5cqw .8cqw;white-space:normal;vertical-align:bottom;color:#4f6370;letter-spacing:.04em}
+  .pg .inj td{font-size:1.55cqw;padding:.55cqw .8cqw;white-space:normal;border-top:.12cqw solid #cfd8de}
+  .pg .inj td:nth-child(3),.pg .inj td:nth-child(4),.pg .inj th:nth-child(3),.pg .inj th:nth-child(4){text-align:left}
+  .pg .badge{font-size:1.25cqw;padding:.15cqw .8cqw}
+  .pg-note{flex:none;margin-top:auto;padding-top:1.2cqw;font-size:1.4cqw;color:#4f6370;line-height:1.4}
+  .pg .more{font-size:1.4cqw;color:#4f6370;margin:.4cqw 0 0}
 }
 </style>
 </head>
@@ -231,6 +249,7 @@ function finish(r) {
   lastRun = { r, demo: wasDemo };
   drawResults();
   drawInjuries(r);
+  buildPdf(r);
   status(wasDemo ? "sample" : "", wasDemo ? "Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real odds." : "");
 }
 let pdfTitle = "Playoff Odds";
@@ -265,6 +284,23 @@ $("eachSeed").addEventListener("change", drawResults);
 function beforePrint() { document.title = pdfTitle; }            // the PDF file name (already set on render)
 window.addEventListener("beforeprint", beforePrint);
 $("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); });
+// the PDF page copies what's on screen (same columns), keeping the injury list short enough to fit
+function buildPdf(r) {
+  $("pdfLeague").textContent = $("phLeague").textContent;
+  $("pdfWhen").textContent = $("phSub").textContent;
+  $("pdfOdds").innerHTML = `<thead>${$("head").innerHTML}</thead><tbody>${$("body").innerHTML}</tbody>`;
+  const cols = $("head").querySelectorAll("th").length;
+  $("pdfOdds").style.setProperty("--fs", `${Math.min(1.75, 21 / cols).toFixed(2)}cqw`);   // more columns, smaller text
+  const teams = r.results.length;
+  const list = r.injuries || [], MAX = Math.max(3, Math.min(6, 18 - teams));               // leave room for the table
+  if (r.injuries_modelled && list.length) {
+    const rows = Array.from($("injBody").children).slice(0, MAX).map((tr) => tr.outerHTML).join("");
+    $("pdfInj").innerHTML = `<h3>Key injuries</h3><table class="inj"><thead>${$("injTable").tHead.innerHTML}</thead><tbody>${rows}</tbody></table>`
+      + (list.length > MAX ? `<p class="more">+${list.length - MAX} more on the website.</p>` : "");
+  } else $("pdfInj").innerHTML = "";
+  $("pdfNote").textContent = $("oddsFoot").textContent;
+}
+$("eachSeed").addEventListener("change", () => { if (lastRun) buildPdf(lastRun.r); });
 function drawInjuries(r) {
   const list = r.injuries || [];
   $("injuries").hidden = false;
@@ -294,5 +330,9 @@ $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
 $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
 </script>
+<div id="pdfDoc" aria-hidden="true">
+  <section class="pg"><div class="pg-head"><div class="pg-title" id="pdfLeague"></div><div class="pg-sub"><b>Playoff Odds</b><br><span id="pdfWhen"></span></div></div>
+    <table id="pdfOdds"></table><div id="pdfInj"></div><p class="pg-note" id="pdfNote"></p></section>
+</div>
 </body>
 </html>
