@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Old Balls playoff odds - Sleeper Monte Carlo (v4).
 
-League rule (editable by flag): seeds 1-6 go to the best records (points-for
-tiebreak) and seed 7 goes to the highest points-for among the other teams.
+League rule (editable by flag): every seed is filled either by record
+(points-for tiebreak) or by points-for, in seed order. --seed-rule RRRRRRP
+(the default) gives seeds 1-6 to the best records and seed 7 to the highest
+points-for among the other teams; --seed-rule PRRRRRR would give the 1 seed to
+the top scorer. --bye-seeds 1,2 marks which seeds get a first-round bye.
 
 OUTPUT (best playoff odds first):
-  Rank | Team | Top 6 Odds | #1 Seed Odds | 7th Seed If Not Top 6 | 7th Seed Odds | Playoff Odds
-  Playoff Odds = Top 6 Odds + 7th Seed Odds, and it is always the last column.
+  Rank | Team | Avg Seed | #1 Seed Odds | Bye Odds | Record Spot | Points Spot | Playoff Odds
+  Avg Seed is the average seed in the seasons where the team gets in.
+  Bye Odds shows only when --bye-seeds is set; Record/Points Spot only when the
+  rule mixes both. --each-seed adds one column per seed. Playoff Odds is last.
 
 HOW THE MODEL WORKS
   1. Pulls standings, weekly scores and the REAL remaining schedule from Sleeper.
@@ -841,15 +846,47 @@ def build_live(rows, teams, feed, level_mean, lineups, final=False):
 # --------------------------------------------------------------------------- #
 # seeding + simulation
 # --------------------------------------------------------------------------- #
-def rank_seeds(ids, records, pf, record_seeds=6, wildcard_seeds=1):
+def seed_rule(args_or_rule=None, record_seeds=6, wildcard_seeds=1):
+    """The seeding rule as a string, one letter per seed: R = by record, P = by points-for."""
+    if isinstance(args_or_rule, str):
+        return args_or_rule.upper()
+    a = args_or_rule
+    rule = getattr(a, "seed_rule", None) if a is not None else None
+    if rule:
+        return rule.upper()
+    if a is not None:
+        record_seeds = getattr(a, "record_seeds", record_seeds)
+        wildcard_seeds = getattr(a, "wildcard_seeds", wildcard_seeds)
+    return "R" * record_seeds + "P" * wildcard_seeds
+
+
+def bye_seeds(args):
+    return sorted(set(getattr(args, "bye_seeds_list", None) or []))
+
+
+def rank_seeds(ids, records, pf, record_seeds=6, wildcard_seeds=1, rule=None):
+    """Fill seeds in order; each seed takes the best team still unseeded by its own method.
+    R: win% then points-for. P: points-for then win%."""
+    rule = seed_rule(rule, record_seeds, wildcard_seeds)
+
     def key(rid):
         w, l, t = records[rid]
         g = w + l + t
         return (-((w + 0.5 * t) / g if g else 0.0), -pf[rid], -w, rid)
 
-    ranked = sorted(ids, key=key)
-    rest = sorted(ranked[record_seeds:], key=lambda r: (-pf[r], r))
-    return ranked[:record_seeds] + rest[:wildcard_seeds]
+    by_rec = sorted(ids, key=key)
+    by_pf = sorted(ids, key=lambda r: (-pf[r],) + key(r))
+    taken, out = set(), []
+    pos = {"R": 0, "P": 0}
+    for m in rule[:len(ids)]:
+        order = by_pf if m == "P" else by_rec
+        i = pos[m]
+        while order[i] in taken:
+            i += 1
+        pos[m] = i + 1
+        taken.add(order[i])
+        out.append(order[i])
+    return out
 
 
 def simulate(teams, schedule, level_mean, level_sd, sigma, lineups, args, sims=None, rng=None, live=None):
@@ -858,7 +895,8 @@ def simulate(teams, schedule, level_mean, level_sd, sigma, lineups, args, sims=N
     ids = list(teams)
     weeks = sorted(schedule)
     K = len(weeks)
-    n_seeds = args.record_seeds + args.wildcard_seeds
+    rule = seed_rule(args)
+    n_seeds = min(len(rule), len(teams))
     cur = {rid: (t["wins"], t["losses"], t["ties"]) for rid, t in teams.items()}
     cur_pf = {rid: t["pf"] for rid, t in teams.items()}
     f_tail = (1 - HEAVY_TAIL_PROB) + HEAVY_TAIL_PROB * HEAVY_TAIL_MULT ** 2
@@ -922,7 +960,7 @@ def simulate(teams, schedule, level_mean, level_sd, sigma, lineups, args, sims=N
                 else:
                     rec[a][2] += 1
                     rec[b][2] += 1
-        field_ = rank_seeds(ids, rec, pf, args.record_seeds, args.wildcard_seeds)
+        field_ = rank_seeds(ids, rec, pf, rule=rule)
         for k, rid in enumerate(field_):
             seeds[rid][k] += 1
         for rid in ids:
@@ -938,24 +976,27 @@ def pct(a, b):
     return 100.0 * a / b if b else None
 
 
-def build_results(teams, sim, record_seeds=6):
+def build_results(teams, sim, rule="RRRRRRP", byes=()):
     n = sim["n"]
+    rule = seed_rule(rule)
     out = []
     for rid, t in teams.items():
         s = sim["seeds"][rid]
-        top6 = pct(sum(s[:record_seeds]), n)
-        seed7 = pct(s[-1], n)
-        missed = n - sum(s[:record_seeds])
+        made = sum(s)
         out.append({
             "team": t["name"], "roster_id": rid,
             "record": f"{t['wins']}-{t['losses']}" + (f"-{t['ties']}" if t["ties"] else ""),
             "pf": t["pf"], "proj_wins": sim["win_tot"][rid] / n,
-            "top6": top6, "seed1": pct(s[0], n), "seed7": seed7,
-            # only meaningful when a top-6 finish is not already a lock
-            "seed7_if_miss": pct(s[-1], missed) if top6 < 99.5 and missed else None,
-            "playoff": pct(sum(s), n),
+            "seed1": pct(s[0], n),
+            # average seed in the seasons where the team gets in
+            "avg_seed": sum((k + 1) * c for k, c in enumerate(s)) / made if made else None,
+            "bye": pct(sum(s[b - 1] for b in byes if b <= len(s)), n),
+            "via_record": pct(sum(c for k, c in enumerate(s) if rule[k] == "R"), n),
+            "via_points": pct(sum(c for k, c in enumerate(s) if rule[k] == "P"), n),
+            "seed_pcts": [pct(c, n) for c in s],
+            "playoff": pct(made, n),
         })
-    out.sort(key=lambda r: (-r["playoff"], -r["top6"], -r["seed1"], -r["proj_wins"]))
+    out.sort(key=lambda r: (-r["playoff"], r["avg_seed"] if r["avg_seed"] is not None else 99, -r["proj_wins"]))
     return out
 
 
@@ -963,21 +1004,35 @@ def fp(v):
     return "--" if v is None else f"{v:.1f}%"
 
 
-def table(results, detail=False):
-    head = ["Rank", "Team"] + (["Record", "PF", "Proj W"] if detail else []) + [
-        "Top 6 Odds", "#1 Seed Odds", "7th Seed If Not Top 6", "7th Seed Odds", "Playoff Odds"]
+def fs(v):
+    return "--" if v is None else f"{v:.1f}"
+
+
+def table(results, detail=False, rule="RRRRRRP", byes=(), each_seed=False):
+    rule = seed_rule(rule)
+    mixed = "R" in rule and "P" in rule
+    n_seeds = len(results[0]["seed_pcts"]) if results else len(rule)
+    head = ["Rank", "Team"] + (["Record", "PF", "Proj W"] if detail else []) + ["Avg Seed", "#1 Seed Odds"]
+    head += ["Bye Odds"] if byes else []
+    head += ["Record Spot Odds", "Points Spot Odds"] if mixed else []
+    head += [f"Seed {k + 1} Odds" for k in range(n_seeds)] if each_seed else []
+    head += ["Playoff Odds"]
     rows = []
     for i, r in enumerate(results, 1):
         row = [str(i), r["team"]]
         if detail:
             row += [r["record"], f"{r['pf']:.1f}", f"{r['proj_wins']:.1f}"]
-        row += [fp(r["top6"]), fp(r["seed1"]), fp(r["seed7_if_miss"]), fp(r["seed7"]), fp(r["playoff"])]
+        row += [fs(r["avg_seed"]), fp(r["seed1"])]
+        row += [fp(r["bye"])] if byes else []
+        row += [fp(r["via_record"]), fp(r["via_points"])] if mixed else []
+        row += [fp(v) for v in r["seed_pcts"]] if each_seed else []
+        row += [fp(r["playoff"])]
         rows.append(row)
     return head, rows
 
 
-def print_table(results, detail=False):
-    head, rows = table(results, detail)
+def print_table(results, detail=False, rule="RRRRRRP", byes=(), each_seed=False):
+    head, rows = table(results, detail, rule, byes, each_seed)
     widths = [max(len(head[c]), *(len(r[c]) for r in rows)) for c in range(len(head))]
     left = {1}                                        # Team column is left-aligned
     fmt = lambda row: "  ".join(row[c].ljust(widths[c]) if c in left else row[c].rjust(widths[c])
@@ -986,23 +1041,24 @@ def print_table(results, detail=False):
     print("-" * len(fmt(head)))
     for r in rows:
         print(fmt(r))
-    n6 = sum(r["top6"] for r in results) / 100
-    print(f"\nChecks: Top 6 sums to {n6:.2f} (should be 6) | #1 Seed sums to "
-          f"{sum(r['seed1'] for r in results):.1f}% | 7th Seed sums to "
-          f"{sum(r['seed7'] for r in results):.1f}% | Playoff Odds sums to "
-          f"{sum(r['playoff'] for r in results) / 100:.2f} (should be 7)")
+    spots = len(results[0]["seed_pcts"]) if results else 0
+    extra = f" | Bye Odds sums to {sum(r['bye'] for r in results) / 100:.2f} (should be {len(byes)})" if byes else ""
+    print(f"\nSeeding: " + " ".join(f"{k + 1}:{'pts' if m == 'P' else 'rec'}" for k, m in enumerate(rule[:spots]))
+          + (f" | byes: {', '.join(map(str, byes))}" if byes else ""))
+    print(f"Checks: #1 Seed sums to {sum(r['seed1'] for r in results):.1f}%{extra} | Playoff Odds sums to "
+          f"{sum(r['playoff'] for r in results) / 100:.2f} (should be {spots})")
 
 
-def write_csv(path, results, detail=False):
-    head, rows = table(results, detail)
+def write_csv(path, results, detail=False, rule="RRRRRRP", byes=(), each_seed=False):
+    head, rows = table(results, detail, rule, byes, each_seed)
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(head)
         w.writerows(rows)
 
 
-def print_paste(results, detail=False):
-    head, rows = table(results, detail)
+def print_paste(results, detail=False, rule="RRRRRRP", byes=(), each_seed=False):
+    head, rows = table(results, detail, rule, byes, each_seed)
     print("\n--- copy from here into Google Sheets ---")
     print("\t".join(head))
     for r in rows:
@@ -1011,7 +1067,7 @@ def print_paste(results, detail=False):
 
 
 LOG_HEAD = ["run_time", "league_id", "season", "first_sim_week", "sims", "team",
-            "top6_pct", "seed1_pct", "seed7_pct", "playoff_pct", "proj_wins"]
+            "avg_seed", "seed1_pct", "bye_pct", "playoff_pct", "proj_wins"]
 
 
 def append_log(path, league_id, season, results, first_week, sims):
@@ -1029,7 +1085,8 @@ def append_log(path, league_id, season, results, first_week, sims):
         stamp = datetime.now().isoformat(timespec="minutes")
         for r in results:
             w.writerow([stamp, league_id, season, first_week, sims, r["team"],
-                        round(r["top6"], 2), round(r["seed1"], 2), round(r["seed7"], 2),
+                        "" if r["avg_seed"] is None else round(r["avg_seed"], 2),
+                        round(r["seed1"], 2), round(r["bye"], 2),
                         round(r["playoff"], 2), round(r["proj_wins"], 2)])
 
 
@@ -1072,8 +1129,9 @@ def run_league(args, quiet=False):
     if settings.get("league_average_match"):
         say("WARNING: this league scores a win vs the weekly median; those extra games are not modelled.")
     pt = settings.get("playoff_teams")
-    if pt and int(pt) != args.record_seeds + args.wildcard_seeds:
-        say(f"WARNING: league playoff_teams={pt} but the model seeds {args.record_seeds}+{args.wildcard_seeds}.")
+    rule, byes = seed_rule(args), bye_seeds(args)
+    if pt and int(pt) != len(rule):
+        say(f"WARNING: league playoff_teams={pt} but the model seeds {len(rule)} teams ({rule}).")
     complete = start_week > end_week
     rows_by_week, week_feeds = {}, {}
     completed = load_history(args.league_id, teams, min(floor, end_week))
@@ -1165,14 +1223,14 @@ def run_league(args, quiet=False):
     t0 = time.time()
     sim = simulate(teams, schedule, level_mean, level_sd, minfo["sigma"], lineups, args,
                    sims=1 if complete else args.simulations, rng=rng, live=live)
-    results = build_results(teams, sim, args.record_seeds)
+    results = build_results(teams, sim, rule, byes)
     if not quiet:
         say(f"Simulated in {time.time() - t0:.1f}s\n")
-        print_table(results, args.detail)
-        write_csv(args.output, results, args.detail)
+        print_table(results, args.detail, rule, byes, args.each_seed)
+        write_csv(args.output, results, args.detail, rule, byes, args.each_seed)
         say(f"\nCSV saved: {Path(args.output).resolve()}")
         if args.paste:
-            print_paste(results, args.detail)
+            print_paste(results, args.detail, rule, byes, args.each_seed)
         if not args.no_log and not complete and not args.forced:
             append_log(args.log, args.league_id, season, results, weeks[0], args.simulations)
             say(f"Run logged to {Path(args.log).resolve()} (use --grade after the season)")
@@ -1444,7 +1502,7 @@ def grade(args):
         raise RuntimeError(f"Season not finished (week {floor} of {end_week} played). Run --grade after the final game.")
     ids = list(teams)
     rec = {r: [teams[r]["wins"], teams[r]["losses"], teams[r]["ties"]] for r in ids}
-    field_ = set(rank_seeds(ids, rec, {r: teams[r]["pf"] for r in ids}, args.record_seeds, args.wildcard_seeds))
+    field_ = set(rank_seeds(ids, rec, {r: teams[r]["pf"] for r in ids}, rule=seed_rule(args)))
     outcome = {teams[r]["name"]: int(r in field_) for r in ids}
     with open(args.log, newline="", encoding="utf-8") as f:
         rows = [r for r in csv.DictReader(f)
@@ -1668,6 +1726,11 @@ def _selftest():
     pf[9] = 5000
     sd = rank_seeds(list(recs), recs, pf)
     assert sd[:2] == [2, 1] and sd[-1] == 9 and len(sd) == 7, sd
+    sp = rank_seeds(list(recs), recs, pf, rule="PRRRRRR")      # 1 seed by points
+    assert sp[0] == 9 and sp[1:3] == [2, 1] and len(sp) == 7, sp
+    sm = rank_seeds(list(recs), recs, pf, rule="RRPRP")        # points seeds mixed in
+    assert sm == [2, 1, 9, 3, 10], sm
+    assert rank_seeds(list(recs), recs, pf, rule="R" * 12) == sorted(recs, key=lambda r: (-recs[r][0], -pf[r]))
 
     class A:
         simulations = 6000; seed = 1; record_seeds = 6; wildcard_seeds = 1; injury_weight = 1.0
@@ -1675,24 +1738,30 @@ def _selftest():
              for i in range(1, 13)}
     sched = {w: [(i, i + 1) for i in range(1, 12, 2)] for w in range(1, 4)}
     sim = simulate(teams, sched, {i: 110.0 for i in teams}, {i: 0.0 for i in teams}, 24.0, {}, A())
-    res = build_results(teams, sim)
+    res = build_results(teams, sim, "RRRRRRP", [1])
     assert abs(sum(r["playoff"] for r in res) - 700) < 1e-6
-    assert abs(sum(r["top6"] for r in res) - 600) < 1e-6 and abs(sum(r["seed1"] for r in res) - 100) < 1e-6
-    assert abs(sum(r["seed7"] for r in res) - 100) < 1e-6
+    assert abs(sum(r["via_record"] for r in res) - 600) < 1e-6 and abs(sum(r["seed1"] for r in res) - 100) < 1e-6
+    assert abs(sum(r["via_points"] for r in res) - 100) < 1e-6 and abs(sum(r["bye"] for r in res) - 100) < 1e-6
     assert all(abs(r["playoff"] - 700 / 12) < 3 for r in res)
+    assert all(1 <= r["avg_seed"] <= 7 for r in res)
     for r in res:
-        assert abs(r["playoff"] - (r["top6"] + r["seed7"])) < 1e-9
-    head, rows = table(res)
-    assert head == ["Rank", "Team", "Top 6 Odds", "#1 Seed Odds", "7th Seed If Not Top 6",
-                    "7th Seed Odds", "Playoff Odds"] and head[-1] == "Playoff Odds" and len(rows) == 12
+        assert abs(r["playoff"] - (r["via_record"] + r["via_points"])) < 1e-9
+        assert abs(r["bye"] - r["seed1"]) < 1e-9
+    head, rows = table(res, False, "RRRRRRP", [1])
+    assert head == ["Rank", "Team", "Avg Seed", "#1 Seed Odds", "Bye Odds", "Record Spot Odds",
+                    "Points Spot Odds", "Playoff Odds"] and len(rows) == 12
+    assert table(res, False, "RRRRRRR")[0] == ["Rank", "Team", "Avg Seed", "#1 Seed Odds", "Playoff Odds"]
+    assert len(table(res, False, "RRRRRRP", (), True)[0]) == 2 + 2 + 2 + 7 + 1
     assert [int(r[0]) for r in rows] == list(range(1, 13))
     # season complete: one deterministic pass -> exactly 7 teams at 100%
     t2 = {i: {"wins": 14 - i, "losses": i, "ties": 0, "pf": 1500.0 - i, "name": f"T{i}", "weekly_scores": []}
           for i in range(1, 13)}
     t2[12]["pf"] = 9999.0
-    r2 = build_results(t2, simulate(t2, {}, {i: 0.0 for i in t2}, {i: 0.0 for i in t2}, 24.0, {}, A(), sims=1))
+    r2 = build_results(t2, simulate(t2, {}, {i: 0.0 for i in t2}, {i: 0.0 for i in t2}, 24.0, {}, A(), sims=1), "RRRRRRP", [1, 2])
     assert sorted(r["team"] for r in r2 if r["playoff"] == 100.0) == sorted(["T1", "T2", "T3", "T4", "T5", "T6", "T12"])
     assert [r["team"] for r in r2 if r["seed1"] == 100.0] == ["T1"]
+    assert sorted(r["team"] for r in r2 if r["bye"] == 100.0) == ["T1", "T2"]
+    assert next(r for r in r2 if r["team"] == "T12")["avg_seed"] == 7.0
     # live week: finished games are locked in (no unplayed starters left => deterministic winner)
     tl = {i: {"wins": 0, "losses": 0, "ties": 0, "pf": 0.0, "name": f"T{i}", "weekly_scores": []} for i in range(1, 13)}
     sch = {1: [(i, i + 1) for i in range(1, 12, 2)]}
@@ -1738,6 +1807,11 @@ def parse_args(argv=None):
     p.add_argument("--end-week", type=int)
     p.add_argument("--record-seeds", type=int, default=6)
     p.add_argument("--wildcard-seeds", type=int, default=1)
+    p.add_argument("--seed-rule", help="one letter per seed, R = record (PF tiebreak), P = points-for, "
+                                       "filled in seed order, e.g. RRRRRRP (default) or PRRRRR; "
+                                       "overrides --record-seeds/--wildcard-seeds")
+    p.add_argument("--bye-seeds", default="", help='seeds that get a first-round bye, e.g. "1,2"')
+    p.add_argument("--each-seed", action="store_true", help="add one odds column per seed")
     p.add_argument("--no-projections", action="store_true", help="scoring history only")
     p.add_argument("--no-injuries", action="store_true")
     p.add_argument("--injury-scale", type=float, default=1.0, help="scale new-injury hazards (0 = none)")
@@ -1791,6 +1865,15 @@ def parse_args(argv=None):
         p.error("--simulations must be positive")
     if not 0 <= a.demo_weeks <= 14:
         p.error("--demo-weeks must be 0-14")
+    rule = seed_rule(a)
+    if not rule or set(rule) - {"R", "P"}:
+        p.error("--seed-rule must be letters R (record) and P (points), e.g. RRRRRRP")
+    try:
+        a.bye_seeds_list = sorted({int(x) for x in str(a.bye_seeds).replace(" ", "").split(",") if x})
+    except ValueError:
+        p.error('--bye-seeds must be seed numbers, e.g. "1,2"')
+    if any(not 1 <= b <= len(rule) for b in a.bye_seeds_list):
+        p.error(f"--bye-seeds must be between 1 and {len(rule)} (the number of playoff seeds)")
     return a
 
 
@@ -1817,21 +1900,24 @@ def main(argv=None):
 # web page entry point (used by the Playoff Odds page; harmless when run normally)
 # --------------------------------------------------------------------------- #
 def run_web(league_id, simulations=5000, questionable_prob=0.78, record_seeds=6, wildcard_seeds=1,
-            demo=False, seed=20261127):
-    """Returns a JSON string: {"rows": [...], "head": [...]} for the web page to draw."""
+            demo=False, seed=20261127, seed_rule_str=None, byes=""):
+    """Returns a JSON string: {"rows": [...], "head": [...], "results": [...]} for the web page to draw."""
     argv = ["--league-id", str(league_id), "--simulations", str(int(simulations)),
             "--questionable-prob", str(questionable_prob), "--record-seeds", str(int(record_seeds)),
             "--wildcard-seeds", str(int(wildcard_seeds)), "--seed", str(int(seed)),
-            "--no-log", "--cache-dir", "/tmp/sleeper_cache"]
+            "--bye-seeds", str(byes or ""), "--no-log", "--cache-dir", "/tmp/sleeper_cache"]
+    if seed_rule_str:
+        argv += ["--seed-rule", str(seed_rule_str)]
     args = parse_args(argv)
     if demo:
         _use_demo(args)
         args.no_log = True
         args.cache_dir = "/tmp/sleeper_cache_demo"
     results, sim, minfo = run_league(args, quiet=True)
-    head, rows = table(results, False)
+    rule, bys = seed_rule(args), bye_seeds(args)
+    head, rows = table(results, False, rule, bys)
     return json.dumps({"head": head, "rows": rows, "results": results, "sims": args.simulations,
-                       "record_seeds": record_seeds, "wildcard_seeds": wildcard_seeds})
+                       "rule": rule, "byes": bys, "spots": min(len(rule), len(results))})
 
 
 if __name__ == "__main__":

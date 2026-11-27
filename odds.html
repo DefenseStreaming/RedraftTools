@@ -45,6 +45,16 @@ td.tm{font-weight:600}
 td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
 tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .check{font-size:13px;color:var(--muted);margin:10px 0 0}
+.seeds{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:14px}
+.seed{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px}
+.seed .n{font-family:var(--display);font-size:20px;font-weight:700;line-height:1}
+.seed select{min-height:36px;padding:4px 8px;background:var(--surface)}
+.seed label.bye,.toggle{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;min-height:28px}
+.seed input[type=checkbox],.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.seed.has-bye{border-color:var(--accent);background:var(--accent-soft)}
+.seedhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.seedhead b{font-weight:600;font-size:14px}
+.restools{display:flex;justify-content:flex-end;margin-bottom:6px}
 .explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
 </style>
 </head>
@@ -58,10 +68,12 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
   <section class="panel" aria-label="Settings">
     <div class="row">
       <div class="grow"><label class="f" for="leagueId">Sleeper league ID</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
-      <div class="sm"><label class="f" for="rec">Spots by record</label><select id="rec"></select></div>
-      <div class="sm"><label class="f" for="wild">Spots by points</label><select id="wild"></select></div>
+      <div class="sm"><label class="f" for="spots">Playoff teams</label><select id="spots"></select></div>
       <div class="sm"><label class="f" for="sims">Simulations</label><select id="sims"><option value="2000">2,000 (fast)</option><option value="5000" selected>5,000</option><option value="10000">10,000 (slowest)</option></select></div>
     </div>
+    <div class="seedhead"><b>How each seed is decided, and who gets a bye</b><button id="resetSeeds" type="button">Reset to 6 by record + 1 by points</button></div>
+    <div class="seeds" id="seeds"></div>
+    <p class="hint">Seeds are filled in order: each one goes to the best team not already seeded, by record (points-for breaks ties) or by total points-for.</p>
     <div class="row" style="margin-top:14px">
       <button id="run" class="primary" type="button">Run</button>
       <button id="demo" type="button">Use sample data</button>
@@ -70,12 +82,13 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
   </section>
   <section id="status" aria-live="polite"></section>
   <section class="panel" id="results" hidden aria-label="Results">
+    <div class="restools"><label class="toggle"><input type="checkbox" id="eachSeed"> Show odds for every seed</label></div>
     <div class="scroll"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
     <p class="check" id="check"></p>
   </section>
   <section class="panel explain">
     <div><b>How it works.</b> Each team's strength comes from its roster and its scoring history. Every simulated season plays out the remaining schedule with random weekly scores, sets each team's best lineup, applies injuries and bye weeks, then seeds the teams. The odds are the share of simulated seasons where a team gets in.</div>
-    <div><b>Columns.</b> Top 6 is finishing in the record-based spots. #1 Seed is the best record. The 7th seed columns cover the points-based spot. Playoff Odds is the total chance of getting in.</div>
+    <div><b>Columns.</b> Avg Seed is the team's average seed in the simulated seasons where it gets in. #1 Seed is the chance of the top seed. Bye Odds is the chance of landing on any seed you marked for a bye. Record Spot and Points Spot split the playoff odds by how the team got in (shown when you mix both). Playoff Odds is the total chance of getting in.</div>
     <div>Results are estimates. Questionable players are treated as 78% likely to play, and Sleeper only updates records on Tuesday morning.</div>
   </section>
 </div>
@@ -83,10 +96,35 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
-for (let i = 1; i <= 12; i++) { $("rec").add(new Option(i, i)); }
-for (let i = 0; i <= 4; i++) { $("wild").add(new Option(i, i)); }
-$("rec").value = 6; $("wild").value = 1;
+for (let i = 1; i <= 12; i++) { $("spots").add(new Option(i, i)); }
 const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+
+// seeding setup: one entry per seed, {m: "R"|"P", bye: bool}
+const DEFAULT_SEEDS = () => [..."RRRRRRP"].map((m, i) => ({ m, bye: i === 0 }));
+let seedCfg = DEFAULT_SEEDS();
+try { const s = JSON.parse(store.get("oddsSeeds") || "null"); if (Array.isArray(s) && s.length >= 1 && s.length <= 12) seedCfg = s.map((x) => ({ m: x.m === "P" ? "P" : "R", bye: !!x.bye })); } catch (e) {}
+const ordinal = (n) => n + (["th", "st", "nd", "rd"][(n % 100 - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
+function saveSeeds() { store.set("oddsSeeds", JSON.stringify(seedCfg)); }
+function drawSeeds() {
+  $("spots").value = seedCfg.length;
+  $("seeds").innerHTML = seedCfg.map((s, i) => `<div class="seed${s.bye ? " has-bye" : ""}">
+    <span class="n">${ordinal(i + 1)} seed</span>
+    <select data-i="${i}" aria-label="${ordinal(i + 1)} seed decided by"><option value="R"${s.m === "R" ? " selected" : ""}>By record</option><option value="P"${s.m === "P" ? " selected" : ""}>By points</option></select>
+    <label class="bye"><input type="checkbox" data-bye="${i}"${s.bye ? " checked" : ""}> Gets a bye</label></div>`).join("");
+}
+$("spots").addEventListener("change", () => {
+  const n = parseInt($("spots").value, 10);
+  while (seedCfg.length < n) seedCfg.push({ m: "R", bye: false });
+  seedCfg.length = n; saveSeeds(); drawSeeds();
+});
+$("seeds").addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.dataset.i !== undefined) seedCfg[+t.dataset.i].m = t.value;
+  if (t.dataset.bye !== undefined) { seedCfg[+t.dataset.bye].bye = t.checked; t.closest(".seed").classList.toggle("has-bye", t.checked); }
+  saveSeeds();
+});
+$("resetSeeds").addEventListener("click", () => { seedCfg = DEFAULT_SEEDS(); saveSeeds(); drawSeeds(); });
+drawSeeds();
 
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
 const ENGINE_URL = new URL("odds_engine.py", location.href).href;
@@ -106,8 +144,8 @@ self.onmessage = async (e) => {
     }
     self.postMessage({ type: "progress", text: m.demo ? "Running the sample league…" : "Reading your league and running the simulation…" });
     py.globals.set("league_id", m.leagueId); py.globals.set("sims", m.sims);
-    py.globals.set("rec", m.rec); py.globals.set("wild", m.wild); py.globals.set("demo", m.demo);
-    const out = py.runPython("odds_engine.run_web(league_id, sims, 0.78, rec, wild, demo)");
+    py.globals.set("rule", m.rule); py.globals.set("byes", m.byes); py.globals.set("demo", m.demo);
+    const out = py.runPython("odds_engine.run_web(league_id, sims, 0.78, demo=demo, seed_rule_str=rule, byes=byes)");
     self.postMessage({ type: "done", json: out });
   } catch (err) { self.postMessage({ type: "error", text: String(err && err.message || err) }); }
 };`;
@@ -134,24 +172,42 @@ function fail(text) {
   if (/Failed to fetch|NetworkError|XMLHttpRequest|CORS|Could not load https/i.test(text)) msg = "The page could not reach Sleeper. Check the league ID and that the league is public, then try again. Details: " + text.slice(0, 200);
   status("error", msg);
 }
+let lastRun = null;
+const fpct = (v) => v == null ? "--" : v.toFixed(1) + "%";
 function finish(r) {
   setBusy(false);
-  const spots = r.record_seeds + r.wildcard_seeds;
-  $("head").innerHTML = "<tr>" + r.head.map((h) => `<th>${esc(h)}</th>`).join("") + "</tr>";
-  $("body").innerHTML = r.rows.map((row, i) => `<tr class="${i < spots ? "in" : ""}">` + row.map((c, k) => `<td class="${k === 1 ? "tm" : ""}${k === row.length - 1 ? " last" : ""}">${esc(c)}</td>`).join("") + "</tr>").join("");
-  const res = r.results;
-  const top = res.reduce((a, x) => a + x.top6, 0) / 100, pl = res.reduce((a, x) => a + x.playoff, 0) / 100;
-  $("check").textContent = `Checks: Top ${r.record_seeds} adds to ${top.toFixed(2)} (should be ${r.record_seeds}) | Playoff Odds adds to ${pl.toFixed(2)} (should be ${spots}) | ${r.sims.toLocaleString()} simulations`;
-  $("results").hidden = false;
+  lastRun = { r, demo: wasDemo };
+  drawResults();
   status(wasDemo ? "sample" : "", wasDemo ? "Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real odds." : "");
 }
+function drawResults() {
+  if (!lastRun) return;
+  const r = lastRun.r, res = r.results, spots = r.spots, byes = r.byes;
+  const mixed = r.rule.includes("R") && r.rule.includes("P"), each = $("eachSeed").checked;
+  const cols = [["Rank", (x, i) => i + 1], ["Team", (x) => x.team],
+    ["Avg Seed", (x) => x.avg_seed == null ? "--" : x.avg_seed.toFixed(1)], ["#1 Seed Odds", (x) => fpct(x.seed1)]];
+  if (byes.length) cols.push([`Bye Odds (${byes.map(ordinal).join(", ")})`, (x) => fpct(x.bye)]);
+  if (mixed) cols.push(["Record Spot Odds", (x) => fpct(x.via_record)], ["Points Spot Odds", (x) => fpct(x.via_points)]);
+  if (each) for (let k = 0; k < spots; k++) cols.push([`${ordinal(k + 1)} (${r.rule[k] === "P" ? "pts" : "rec"})`, (x) => fpct(x.seed_pcts[k])]);
+  cols.push(["Playoff Odds", (x) => fpct(x.playoff)]);
+  $("head").innerHTML = "<tr>" + cols.map(([h]) => `<th>${esc(h)}</th>`).join("") + "</tr>";
+  $("body").innerHTML = res.map((x, i) => `<tr class="${i < spots ? "in" : ""}">` + cols.map(([, f], k) =>
+    `<td class="${k === 1 ? "tm" : ""}${k === cols.length - 1 ? " last" : ""}">${esc(f(x, i))}</td>`).join("") + "</tr>").join("");
+  const pl = res.reduce((a, x) => a + x.playoff, 0) / 100, s1 = res.reduce((a, x) => a + x.seed1, 0) / 100;
+  const by = res.reduce((a, x) => a + x.bye, 0) / 100;
+  $("check").textContent = `Seeding: ${[...r.rule.slice(0, spots)].map((m, k) => `${k + 1} ${m === "P" ? "pts" : "rec"}`).join(" · ")}`
+    + ` | Checks: #1 Seed adds to ${s1.toFixed(2)} (should be 1)` + (byes.length ? ` | Bye Odds adds to ${by.toFixed(2)} (should be ${byes.length})` : "")
+    + ` | Playoff Odds adds to ${pl.toFixed(2)} (should be ${spots}) | ${r.sims.toLocaleString()} simulations`;
+  $("results").hidden = false;
+}
+$("eachSeed").addEventListener("change", drawResults);
 function go(demo) {
   const id = $("leagueId").value.trim();
   if (!demo && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }
   if (!demo) store.set("oddsLeague", id);
   wasDemo = demo; setBusy(true); status("note", "Starting…");
   getWorker().postMessage({ pyodide: PYODIDE, engine: ENGINE_URL, leagueId: demo ? "demo" : id, sims: parseInt($("sims").value, 10),
-    rec: parseInt($("rec").value, 10), wild: parseInt($("wild").value, 10), demo });
+    rule: seedCfg.map((x) => x.m).join(""), byes: seedCfg.map((x, i) => x.bye ? i + 1 : 0).filter(Boolean).join(","), demo });
 }
 $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
