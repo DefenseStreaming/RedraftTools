@@ -120,10 +120,11 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   td{padding:4px 5px;font-size:9.5pt}td.tm{white-space:normal}td.last{font-size:16pt}
 }
 .ptiers{display:none}
+#printChart{display:none}
 @media print{
   .meta,.legend,#tblPanel,.printfoot{display:none!important}
   /* page 1: tiles, tier banner on top, one full page */
-  .tiles{grid-template-columns:repeat(3,1fr);grid-auto-rows:2.27in;gap:8px}
+  .tiles{grid-template-columns:repeat(3,1fr);grid-auto-rows:2.02in;gap:8px}
   .tile{position:relative;break-inside:avoid}
   .tile .tier{order:-1;margin-top:0;font-size:15px;padding:8px 12px;white-space:nowrap;overflow:hidden}
   .tile .top{flex:1;padding:10px 12px 6px}
@@ -131,7 +132,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   .tile .rk{font-size:44px}.tile .nm{font-size:22px;overflow-wrap:normal;word-break:normal}.tile .sc b{font-size:30px}.tile .sub2{font-size:12px}
   button.tier::after{display:none}
   /* page 2: tier guide */
-  .ptiers{display:flex!important;flex-direction:column;gap:8px;break-before:page;height:9.95in}
+  .ptiers{display:flex!important;flex-direction:column;gap:8px;break-before:page;height:8.95in}
   .ptiers h2{font-family:var(--display);font-size:28px;margin:0;border-bottom:3px solid var(--accent);padding-bottom:4px}
   .ptier{flex:1;display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;break-inside:avoid}
   .ptier .pt-band{flex:none;width:2.1in;color:#fff;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px}
@@ -144,8 +145,9 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
   /* page 3: history graph, full page */
   #history{break-before:page;padding:8px 10px;break-inside:avoid}
   #history h2{font-size:28px;border-bottom:3px solid var(--accent);padding-bottom:4px;margin-bottom:6px}
-  #chartbox svg{width:100%!important;height:8.85in!important}
-  #chartbox .tip{display:none!important}
+  #chartbox{display:none!important}
+  #printChart{display:block!important}
+  #printChart svg{width:100%!important;height:7.9in!important}
   .picks,#history details,#histLede{display:none!important}
   .chartbox text.tierlbl{text-decoration:none}
 }
@@ -181,6 +183,7 @@ td .pill{display:inline-block;font-size:12px;font-weight:600;color:#fff;padding:
       <p class="lede" id="histLede">Each line is a team's power score after every week. Pick up to three teams to highlight, hover a week to see everyone, and tap a tier name to see what it means.</p>
       <div class="picks" id="picks"></div>
       <div class="chartbox" id="chartbox"></div>
+      <div class="chartbox" id="printChart" aria-hidden="true"></div>
       <details><summary>Show as a table</summary><div class="scroll" style="margin-top:6px"><table id="histTable"></table></div></details>
     </section>
     <div class="panel scroll" id="tblPanel"><table id="tbl"><thead><tr><th>Rank</th><th>Team</th><th>Tier</th><th>Record</th><th>Points for</th><th>Roster (pts/wk)</th><th>Record z</th><th>Points z</th><th>Roster z</th><th>Score</th></tr></thead><tbody id="body"></tbody></table></div>
@@ -227,6 +230,7 @@ let pdfTitle = "Power Rankings";
 function render(b, rows, sample) {
   const lname = b.league.name || "Your league";
   pdfTitle = `${lname} Week ${b.gp} Power Rankings`;
+  document.title = pdfTitle;          // stays set: iPhone's print sheet reads it later, as the PDF name
   $("phLeague").textContent = lname;
   $("phSub").textContent = `Week ${b.gp} · ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
   $("meta").innerHTML = `<b>${esc(b.league.name || "Your league")}</b> · standings through week ${b.gp} · roster strength looks at weeks ${b.remaining.slice(0, 4).join(", ") || "none left (points per game used)"}`;
@@ -288,7 +292,7 @@ function drawHistory(b, rows) {
   const box = $("history");
   if (!H || !H.hist.weeks.length) { box.hidden = true; return; }
   box.hidden = false;
-  drawPicks(); drawChart();
+  drawPicks(); drawBoth();
   const wk = H.hist.weeks;
   $("histTable").innerHTML = `<thead><tr><th>Team</th><th></th>${wk.map((w) => `<th>Wk ${w}</th>`).join("")}</tr></thead><tbody>` +
     rows.map((r) => `<tr><td class="tm">${esc(r.name)}</td><td></td>${H.hist.series[r.rid].map((v, i) => `<td title="Rank ${H.hist.ranks[r.rid][i]}">${v.toFixed(1)}</td>`).join("")}</tr>`).join("") + "</tbody>";
@@ -303,11 +307,13 @@ $("picks").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-rid]"); if (!btn) return;
   const rid = +btn.dataset.rid, i = H.picks.indexOf(rid);
   if (i >= 0) H.picks.splice(i, 1); else { H.picks.push(rid); if (H.picks.length > 3) H.picks.shift(); }
-  drawPicks(); drawChart();
+  drawPicks(); drawBoth();
 });
 function el(tag, attrs, parent) { const n = document.createElementNS(SVGNS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
-function drawChart(forceW, forceH) {
-  const box = $("chartbox"); box.innerHTML = "";
+// screen chart, plus a print-sized copy that is always ready (iPhone may end "printing" before the PDF is made)
+function drawBoth() { drawChart(); drawChart(760, 910, $("printChart")); }
+function drawChart(forceW, forceH, target) {
+  const box = target || $("chartbox"); box.innerHTML = "";
   const { weeks, series, ranks } = H.hist;
   const W = forceW || Math.max(300, box.clientWidth), narrow = W < 640;
   const Ht = forceH || (narrow ? 340 : 440), m = { l: narrow ? 30 : 150, r: narrow ? 8 : (forceW ? 132 : 160), t: 12, b: 30 };
@@ -384,22 +390,12 @@ function drawChart(forceW, forceH) {
   hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show);
   hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("opacity", 0); });
 }
-window.addEventListener("resize", () => { if (H && !$("history").hidden && !printing) drawChart(); });
+window.addEventListener("resize", () => { if (H && !$("history").hidden) drawChart(); });
 /* ---------- export to PDF (the browser's print dialog -> Save as PDF) ---------- */
-let printing = false, oldTitle = document.title;
-function beforePrint() {
-  if (printing) return; printing = true;
-  oldTitle = document.title; document.title = pdfTitle;           // becomes the PDF file name
-  if (H && !$("history").hidden) drawChart(760, 910);            // full chart layout at page width
-}
-function afterPrint() {
-  if (!printing) return; printing = false;
-  document.title = oldTitle;
-  if (H && !$("history").hidden) drawChart();
-}
+let printing = false;
+function beforePrint() { document.title = pdfTitle; }            // the PDF file name (already set on render)
 window.addEventListener("beforeprint", beforePrint);
-window.addEventListener("afterprint", afterPrint);
-$("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); setTimeout(afterPrint, 1000); });
+$("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); });
 
 async function go(sample) {
   const id = $("leagueId").value.trim();

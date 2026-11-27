@@ -239,6 +239,7 @@ function drawResults() {
   const r = lastRun.r, res = r.results, spots = r.spots, byes = r.byes;
   const lname = r.league_name || "Your league", wk = r.weeks_played != null ? r.weeks_played : (r.week ? r.week - 1 : "");
   pdfTitle = `${lname} Week ${wk} Playoff Odds`;
+  document.title = pdfTitle;          // stays set: iPhone's print sheet reads it later, as the PDF name
   $("phLeague").textContent = lname;
   $("phSub").textContent = `Week ${wk} · ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
   $("oddsFoot").textContent = `${spots} playoff spots (seeds ${[...r.rule.slice(0, spots)].map((m, k) => `${k + 1} ${m === "P" ? "by points" : "by record"}`).join(", ")})`
@@ -261,12 +262,9 @@ function drawResults() {
   $("results").hidden = false;
 }
 $("eachSeed").addEventListener("change", drawResults);
-let printing = false, oldTitle = document.title;
-function beforePrint() { if (printing) return; printing = true; oldTitle = document.title; document.title = pdfTitle; }
-function afterPrint() { if (!printing) return; printing = false; document.title = oldTitle; }
+function beforePrint() { document.title = pdfTitle; }            // the PDF file name (already set on render)
 window.addEventListener("beforeprint", beforePrint);
-window.addEventListener("afterprint", afterPrint);
-$("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); setTimeout(afterPrint, 1000); });
+$("exportPdf").addEventListener("click", () => { beforePrint(); window.print(); });
 function drawInjuries(r) {
   const list = r.injuries || [];
   $("injuries").hidden = false;
