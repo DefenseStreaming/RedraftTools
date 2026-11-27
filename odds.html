@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playoff Odds | Old Balls Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one settings strip, one Run button, one results table. */
+:root{--bg:#eef2f4;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#5b6f7c;--line:#d6dee3;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;--display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:40px;line-height:1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:64ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row .grow{flex:2 1 260px}.row .sm{flex:1 1 130px}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-size:22px;letter-spacing:.03em;font-weight:600;padding:6px 32px}
+button:disabled{opacity:.6;cursor:progress}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.banner{border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:8px}
+.banner.error{background:var(--bad-bg);color:var(--bad-ink)}
+.banner.note{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.banner.sample{background:var(--warn-bg);color:var(--warn-ink)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;font-weight:600;white-space:nowrap}
+th:nth-child(1),th:nth-child(2),td:nth-child(1),td:nth-child(2){text-align:left}
+td{padding:9px 10px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+td.tm{font-weight:600}
+td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
+tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.check{font-size:13px;color:var(--muted);margin:10px 0 0}
+.explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+</style>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Old Balls Tools</a><a href="defense.html">Defense Streamer</a><a class="soon" href="#" aria-disabled="true">Power Rankings</a><a href="odds.html" aria-current="page">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>Playoff Odds</h1>
+    <p class="sub">Full simulation of your league: lineups, injuries, bye weeks and live scoring. Enter your Sleeper league ID and press Run.</p>
+  </header>
+  <section class="panel" aria-label="Settings">
+    <div class="row">
+      <div class="grow"><label class="f" for="leagueId">Sleeper league ID</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
+      <div class="sm"><label class="f" for="rec">Spots by record</label><select id="rec"></select></div>
+      <div class="sm"><label class="f" for="wild">Spots by points</label><select id="wild"></select></div>
+      <div class="sm"><label class="f" for="sims">Simulations</label><select id="sims"><option value="2000">2,000 (fast)</option><option value="5000" selected>5,000</option><option value="10000">10,000 (slowest)</option></select></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="run" class="primary" type="button">Run</button>
+      <button id="demo" type="button">Use sample data</button>
+    </div>
+    <p class="hint">The first run downloads the Python engine and Sleeper's player list, so it can take 30 seconds or more. Later runs in the same visit are faster. No Sleeper league? Try the <a href="quick.html">quick calculator</a>.</p>
+  </section>
+  <section id="status" aria-live="polite"></section>
+  <section class="panel" id="results" hidden aria-label="Results">
+    <div class="scroll"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+    <p class="check" id="check"></p>
+  </section>
+  <section class="panel explain">
+    <div><b>How it works.</b> Each team's strength comes from its roster and its scoring history. Every simulated season plays out the remaining schedule with random weekly scores, sets each team's best lineup, applies injuries and bye weeks, then seeds the teams. The odds are the share of simulated seasons where a team gets in.</div>
+    <div><b>Columns.</b> Top 6 is finishing in the record-based spots. #1 Seed is the best record. The 7th seed columns cover the points-based spot. Playoff Odds is the total chance of getting in.</div>
+    <div>Results are estimates. Questionable players are treated as 78% likely to play, and Sleeper only updates records on Tuesday morning.</div>
+  </section>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+for (let i = 1; i <= 12; i++) { $("rec").add(new Option(i, i)); }
+for (let i = 0; i <= 4; i++) { $("wild").add(new Option(i, i)); }
+$("rec").value = 6; $("wild").value = 1;
+const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+
+const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
+const ENGINE_URL = new URL("odds_engine.py", location.href).href;
+const workerSource = `
+let py = null;
+self.onmessage = async (e) => {
+  const m = e.data;
+  try {
+    if (!py) {
+      self.postMessage({ type: "progress", text: "Loading the Python engine…" });
+      importScripts(m.pyodide + "pyodide.js");
+      py = await loadPyodide({ indexURL: m.pyodide });
+      const res = await fetch(m.engine, { cache: "no-cache" });
+      if (!res.ok) throw new Error("Could not load odds_engine.py (HTTP " + res.status + "). Upload it next to this page.");
+      py.FS.writeFile("/home/pyodide/odds_engine.py", await res.text());
+      py.runPython("import sys; sys.path.insert(0, '/home/pyodide'); import odds_engine");
+    }
+    self.postMessage({ type: "progress", text: m.demo ? "Running the sample league…" : "Reading your league and running the simulation…" });
+    py.globals.set("league_id", m.leagueId); py.globals.set("sims", m.sims);
+    py.globals.set("rec", m.rec); py.globals.set("wild", m.wild); py.globals.set("demo", m.demo);
+    const out = py.runPython("odds_engine.run_web(league_id, sims, 0.78, rec, wild, demo)");
+    self.postMessage({ type: "done", json: out });
+  } catch (err) { self.postMessage({ type: "error", text: String(err && err.message || err) }); }
+};`;
+let worker = null;
+function getWorker() {
+  if (!worker) {
+    worker = new Worker(URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })));
+    worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === "progress") status("note", m.text);
+      else if (m.type === "done") { finish(JSON.parse(m.json)); }
+      else if (m.type === "error") { fail(m.text); }
+    };
+    worker.onerror = (e) => fail("The Python engine could not start: " + (e.message || "unknown error"));
+  }
+  return worker;
+}
+let wasDemo = false;
+function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
+function setBusy(b) { $("run").disabled = b; $("demo").disabled = b; }
+function fail(text) {
+  setBusy(false);
+  let msg = text;
+  if (/Failed to fetch|NetworkError|XMLHttpRequest|CORS|Could not load https/i.test(text)) msg = "The page could not reach Sleeper. Check the league ID and that the league is public, then try again. Details: " + text.slice(0, 200);
+  status("error", msg);
+}
+function finish(r) {
+  setBusy(false);
+  const spots = r.record_seeds + r.wildcard_seeds;
+  $("head").innerHTML = "<tr>" + r.head.map((h) => `<th>${esc(h)}</th>`).join("") + "</tr>";
+  $("body").innerHTML = r.rows.map((row, i) => `<tr class="${i < spots ? "in" : ""}">` + row.map((c, k) => `<td class="${k === 1 ? "tm" : ""}${k === row.length - 1 ? " last" : ""}">${esc(c)}</td>`).join("") + "</tr>").join("");
+  const res = r.results;
+  const top = res.reduce((a, x) => a + x.top6, 0) / 100, pl = res.reduce((a, x) => a + x.playoff, 0) / 100;
+  $("check").textContent = `Checks: Top ${r.record_seeds} adds to ${top.toFixed(2)} (should be ${r.record_seeds}) | Playoff Odds adds to ${pl.toFixed(2)} (should be ${spots}) | ${r.sims.toLocaleString()} simulations`;
+  $("results").hidden = false;
+  status(wasDemo ? "sample" : "", wasDemo ? "Sample data. These are made-up teams so you can see the layout. Enter your league ID and press Run for your real odds." : "");
+}
+function go(demo) {
+  const id = $("leagueId").value.trim();
+  if (!demo && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }
+  if (!demo) store.set("oddsLeague", id);
+  wasDemo = demo; setBusy(true); status("note", "Starting…");
+  getWorker().postMessage({ pyodide: PYODIDE, engine: ENGINE_URL, leagueId: demo ? "demo" : id, sims: parseInt($("sims").value, 10),
+    rec: parseInt($("rec").value, 10), wild: parseInt($("wild").value, 10), demo });
+}
+$("run").addEventListener("click", () => go(false));
+$("demo").addEventListener("click", () => go(true));
+$("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
+</script>
+</body>
+</html>

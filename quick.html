@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick Odds Calculator | Old Balls Tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: settings strip, editable team table, live odds table that redraws on every change. */
+:root{--bg:#eef2f4;--surface:#fff;--surface-2:#f6f8f9;--ink:#0f2230;--muted:#5b6f7c;--line:#d6dee3;--accent:#0d6b4d;--accent-ink:#fff;--accent-soft:#dff1ea;--warn-bg:#fff4d6;--warn-ink:#6b4a00;--bad-bg:#fde4e1;--bad-ink:#7a1d12;--display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c171f;--surface:#14232d;--surface-2:#192c38;--ink:#e8f0f4;--muted:#93a8b5;--line:#28404f;--accent:#3ec99a;--accent-ink:#06231a;--accent-soft:#123a2e;--warn-bg:#3a2f10;--warn-ink:#f2d78a;--bad-bg:#3d1a16;--bad-ink:#f5b3aa;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+.sitenav{background:var(--surface);border-bottom:1px solid var(--line)}
+.sitenav .in{max-width:1180px;margin:0 auto;padding:0 16px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
+.sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
+.sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+.sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
+.sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:40px;line-height:1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:64ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:760px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+label.f{display:block;font-weight:600;font-size:14px;margin-bottom:4px}
+input[type=text],input[type=number],select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink);font:inherit}
+.hint{color:var(--muted);font-size:13px;margin:4px 0 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row .grow{flex:1 1 220px}
+button{font:inherit;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 14px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.6;cursor:progress}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.banner{border-radius:8px;padding:10px 12px;font-size:14px}
+.banner.error{background:var(--bad-bg);color:var(--bad-ink)}
+.banner.note{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.two{display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:980px){.two{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+h2{font-family:var(--display);font-size:26px;margin:0 0 10px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 6px;font-weight:600;white-space:nowrap}
+td{padding:4px 6px;border-top:1px solid var(--line);vertical-align:middle}
+th.n,td.n{text-align:right}
+.team-in{table-layout:auto}
+.team-in input{min-height:40px;padding:4px 8px}
+.team-in input.num{width:64px;text-align:right}
+.team-in input.name{min-width:120px}
+.odds td{padding:8px 8px}
+.odds .tm{font-weight:600;white-space:nowrap}
+.odds .big{font-family:var(--display);font-size:24px;font-weight:700;text-align:right;white-space:nowrap}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;min-width:60px;margin-top:3px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.check{font-size:13px;color:var(--muted);margin-top:8px}
+.explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+</style>
+</head>
+<body>
+<nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Old Balls Tools</a><a href="defense.html">Defense Streamer</a><a class="soon" href="#" aria-disabled="true">Power Rankings</a><a href="odds.html">Playoff Odds</a></div></nav>
+<div class="wrap">
+  <header>
+    <h1>Quick Odds Calculator</h1>
+    <p class="sub">Type in any standings, or load them from Sleeper. The odds redraw every time you change something. For the full injury-aware model, use the Playoff Odds page.</p>
+  </header>
+
+  <section class="panel" aria-label="Settings">
+    <div class="row" style="margin-bottom:14px">
+      <div class="grow"><label class="f" for="leagueId">Sleeper league ID (optional)</label><input id="leagueId" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1326964109681385472"></div>
+      <button id="load" class="primary" type="button">Load from Sleeper</button>
+    </div>
+    <div class="grid">
+      <div><label class="f" for="size">Teams in league</label><select id="size"><option>8</option><option>10</option><option selected>12</option><option>14</option></select></div>
+      <div><label class="f" for="games">Regular season games</label><input id="games" type="number" min="1" max="18" value="14"></div>
+      <div><label class="f" for="spots">Playoff spots</label><select id="spots"></select></div>
+      <div><label class="f" for="pts">Spots decided by points scored</label><select id="pts"></select></div>
+    </div>
+    <p class="hint">Teams are seeded by record first (ties broken by points scored). Any spots set to points go to the highest scorers who missed on record. Old Balls uses 7 spots with 1 by points.</p>
+    <div class="grid" style="margin-top:12px">
+      <div><label class="f" for="swing">Weekly scoring swing (pts)</label><input id="swing" type="number" min="5" max="60" value="24"><p class="hint">Typical spread in one team's weekly score.</p></div>
+      <div><label class="f" for="sims">Simulations</label><select id="sims"><option>2000</option><option selected>10000</option><option>30000</option></select></div>
+    </div>
+  </section>
+
+  <section id="status" aria-live="polite"></section>
+
+  <div class="two">
+    <section class="panel" aria-label="Standings you can edit">
+      <h2>Standings</h2>
+      <div class="scroll"><table class="team-in"><thead><tr><th>Team</th><th class="n">W</th><th class="n">L</th><th class="n">T</th><th class="n">Points for</th></tr></thead><tbody id="teams"></tbody></table></div>
+      <p class="hint" id="schedNote"></p>
+    </section>
+    <section class="panel" aria-label="Playoff odds">
+      <h2>Odds</h2>
+      <div class="scroll"><table class="odds"><thead id="oddsHead"></thead><tbody id="odds"></tbody></table></div>
+      <p class="check" id="check"></p>
+    </section>
+  </div>
+
+  <section class="panel explain">
+    <div><b>How it works.</b> Each team's scoring level starts from its points per game so far, pulled toward the league average when few games have been played. Every simulated season draws a level for each team, plays out the rest of the schedule with random weekly scores, and applies your seeding rules. The odds are the share of simulated seasons where a team gets in.</div>
+    <div>Loaded from Sleeper, it uses your real remaining schedule. Typed in by hand, it pairs teams at random for the games they have left. It does not know about injuries, byes or roster moves, so treat it as a standings-based estimate.</div>
+  </section>
+</div>
+
+<script>
+/* ====================== CORE START (no DOM) ====================== */
+function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const SHRINK_GAMES = 3;
+
+/* teams: [{name,w,l,t,pf}]; schedule: array of weeks, each an array of [i,j]; null = random pairings.
+   cfg: {spots, ptsSpots, totalGames, sims, swing, seed} */
+function simulate(teams, schedule, cfg) {
+  const n = teams.length, rnd = mulberry32(cfg.seed || 12345);
+  const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const g = teams.map((t) => t.w + t.l + t.t);
+  const totG = g.reduce((a, b) => a + b, 0), totPF = teams.reduce((a, t) => a + t.pf, 0);
+  const lm = totG > 0 ? totPF / totG : 100;
+  const mu = teams.map((t, i) => (t.pf + SHRINK_GAMES * lm) / (g[i] + SHRINK_GAMES));
+  const lvlSD = g.map((x) => cfg.swing / Math.sqrt(x + SHRINK_GAMES));
+  const remain = g.map((x) => Math.max(0, cfg.totalGames - x));
+  const maxRem = schedule ? schedule.length : Math.max(0, ...remain);
+  const recSpots = cfg.spots - cfg.ptsSpots;
+  const made = new Array(n).fill(0), byRec = new Array(n).fill(0), byPts = new Array(n).fill(0), seed1 = new Array(n).fill(0), winSum = new Array(n).fill(0);
+  const level = new Array(n), wins = new Array(n), pf = new Array(n);
+  const idx = Array.from({ length: n }, (_, i) => i);
+  for (let s = 0; s < cfg.sims; s++) {
+    for (let i = 0; i < n; i++) { level[i] = mu[i] + lvlSD[i] * gauss(); wins[i] = teams[i].w + 0.5 * teams[i].t; pf[i] = teams[i].pf; }
+    for (let w = 0; w < maxRem; w++) {
+      let pairs;
+      if (schedule) pairs = schedule[w];
+      else {
+        const pool = idx.filter((i) => remain[i] > w);
+        for (let k = pool.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); const x = pool[k]; pool[k] = pool[j]; pool[j] = x; }
+        pairs = [];
+        for (let k = 0; k + 1 < pool.length; k += 2) pairs.push([pool[k], pool[k + 1]]);
+      }
+      for (const [a, b] of pairs) {
+        const sa = level[a] + cfg.swing * gauss(), sb = level[b] + cfg.swing * gauss();
+        pf[a] += sa; pf[b] += sb;
+        if (sa > sb) wins[a] += 1; else wins[b] += 1;
+      }
+    }
+    const order = idx.slice().sort((a, b) => (wins[b] - wins[a]) || (pf[b] - pf[a]));
+    seed1[order[0]]++;
+    for (let k = 0; k < recSpots; k++) { made[order[k]]++; byRec[order[k]]++; }
+    if (cfg.ptsSpots > 0) {
+      const rest = order.slice(recSpots).sort((a, b) => pf[b] - pf[a]);
+      for (let k = 0; k < cfg.ptsSpots && k < rest.length; k++) { made[rest[k]]++; byPts[rest[k]]++; }
+    }
+    for (let i = 0; i < n; i++) winSum[i] += wins[i];
+  }
+  const S = cfg.sims;
+  return teams.map((t, i) => ({ name: t.name, w: t.w, l: t.l, t: t.t, pf: t.pf, playoff: made[i] / S, byRecord: byRec[i] / S, byPoints: byPts[i] / S, seed1: seed1[i] / S, avgWins: winSum[i] / S }));
+}
+
+async function loadSleeper(fetchJson, leagueId) {
+  const API = "https://api.sleeper.app/v1";
+  const league = await fetchJson(`${API}/league/${leagueId}`);
+  if (!league || !league.settings) throw new Error("That league was not found or is not public. Check the league ID.");
+  const [rosters, users] = await Promise.all([fetchJson(`${API}/league/${leagueId}/rosters`), fetchJson(`${API}/league/${leagueId}/users`)]);
+  const um = {}; for (const u of users || []) um[u.user_id] = u;
+  const teams = [], rid = [];
+  for (const r of rosters || []) {
+    const u = um[r.owner_id] || {}, st = r.settings || {};
+    teams.push({ name: (u.metadata && u.metadata.team_name) || u.display_name || `Team ${r.roster_id}`, w: st.wins || 0, l: st.losses || 0, t: st.ties || 0, pf: (st.fpts || 0) + (st.fpts_decimal || 0) / 100 });
+    rid.push(r.roster_id);
+  }
+  const pws = league.settings.playoff_week_start || 15;
+  const totalGames = pws - 1;
+  const played = Math.max(0, ...teams.map((t) => t.w + t.l + t.t));
+  const schedule = []; let scheduleOk = true;
+  for (let w = played + 1; w <= totalGames; w++) {
+    try {
+      const m = await fetchJson(`${API}/league/${leagueId}/matchups/${w}`);
+      const by = {};
+      for (const e of m || []) { if (e.matchup_id == null) continue; (by[e.matchup_id] = by[e.matchup_id] || []).push(rid.indexOf(e.roster_id)); }
+      const pairs = Object.values(by).filter((p) => p.length === 2 && p[0] >= 0 && p[1] >= 0);
+      if (!pairs.length) { scheduleOk = false; break; }
+      schedule.push(pairs);
+    } catch (e) { scheduleOk = false; break; }
+  }
+  return { name: league.name, teams, totalGames, spots: league.settings.playoff_teams || 6, schedule: scheduleOk ? schedule : null, scheduleOk };
+}
+/* ======================= CORE END ======================= */
+
+if (typeof document !== "undefined") {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  let teams = [], schedule = null, timer = null;
+  const defaults = [["McGukin", 9, 4, 0, 1620], ["Garrett", 8, 5, 0, 1590], ["Fed", 8, 5, 0, 1540], ["Camran", 7, 6, 0, 1520], ["Miller", 7, 6, 0, 1500], ["Overstreet", 7, 6, 0, 1480],
+    ["Oliver", 6, 7, 0, 1470], ["Spencer", 6, 7, 0, 1450], ["Grant", 6, 7, 0, 1430], ["Riley", 5, 8, 0, 1410], ["Keafen", 4, 9, 0, 1380], ["Fearn", 3, 10, 0, 1330]];
+
+  function fillSelect(sel, from, to, val) { sel.innerHTML = ""; for (let i = from; i <= to; i++) { const o = document.createElement("option"); o.value = o.textContent = i; sel.appendChild(o); } sel.value = Math.min(Math.max(val, from), to); }
+  function refreshSpotSelects() {
+    const n = parseInt($("size").value, 10), cur = parseInt($("spots").value, 10) || Math.round(n / 2);
+    fillSelect($("spots"), 1, n - 1, cur);
+    const p = parseInt($("pts").value, 10) || 0;
+    fillSelect($("pts"), 0, parseInt($("spots").value, 10), p);
+  }
+  function resizeTeams() {
+    const n = parseInt($("size").value, 10);
+    while (teams.length < n) teams.push({ name: "Team " + (teams.length + 1), w: 0, l: 0, t: 0, pf: 0 });
+    teams = teams.slice(0, n);
+    schedule = null;
+  }
+  function drawInputs() {
+    $("teams").innerHTML = teams.map((t, i) => `<tr><td><input class="name" data-i="${i}" data-k="name" aria-label="Team ${i + 1} name" value="${esc(t.name)}"></td>` +
+      ["w", "l", "t"].map((k) => `<td><input class="num" type="number" min="0" max="30" data-i="${i}" data-k="${k}" aria-label="${esc(t.name)} ${k === "w" ? "wins" : k === "l" ? "losses" : "ties"}" value="${t[k]}"></td>`).join("") +
+      `<td><input class="num" style="width:84px" type="number" min="0" step="0.01" data-i="${i}" data-k="pf" aria-label="${esc(t.name)} points for" value="${t.pf}"></td></tr>`).join("");
+    $("schedNote").textContent = schedule ? "Using your league's real remaining schedule from Sleeper." : "Remaining games are paired at random for each simulated season.";
+  }
+  function showStatus(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
+
+  function run() {
+    const cfg = { spots: parseInt($("spots").value, 10), ptsSpots: parseInt($("pts").value, 10) || 0, totalGames: parseInt($("games").value, 10) || 14,
+      sims: parseInt($("sims").value, 10), swing: parseFloat($("swing").value) || 24, seed: 20261127 };
+    const bad = teams.find((t) => t.w + t.l + t.t > cfg.totalGames);
+    if (bad) { showStatus("error", `${bad.name} has played more games than the season length. Fix the record or raise regular season games.`); return; }
+    if (schedule && schedule.length && teams.some((t) => t.w + t.l + t.t + 0 > cfg.totalGames)) schedule = null;
+    showStatus("", "");
+    const res = simulate(teams, schedule, cfg).sort((a, b) => (b.playoff - a.playoff) || (b.avgWins - a.avgWins));
+    const hasPts = cfg.ptsSpots > 0;
+    $("oddsHead").innerHTML = `<tr><th>#</th><th>Team</th><th class="n">Record</th><th class="n">Seed 1</th>${hasPts ? `<th class="n">By points</th>` : ""}<th class="n">Playoff odds</th></tr>`;
+    const pc = (x) => (x * 100).toFixed(x > 0 && x < 0.001 ? 2 : 1) + "%";
+    $("odds").innerHTML = res.map((r, i) => `<tr class="${i < cfg.spots ? "in" : ""}"><td>${i + 1}</td><td class="tm">${esc(r.name)}</td><td class="n">${r.w}-${r.l}${r.t ? "-" + r.t : ""}</td><td class="n">${pc(r.seed1)}</td>${hasPts ? `<td class="n">${pc(r.byPoints)}</td>` : ""}` +
+      `<td><div class="big">${pc(r.playoff)}</div><div class="bar"><i style="width:${(r.playoff * 100).toFixed(1)}%"></i></div></td></tr>`).join("");
+    const sum = res.reduce((a, r) => a + r.playoff, 0);
+    $("check").textContent = `Check: playoff odds add up to ${sum.toFixed(2)} (should equal ${cfg.spots}).`;
+  }
+  function schedule_run() { clearTimeout(timer); timer = setTimeout(run, 150); }
+
+  $("teams").addEventListener("input", (e) => {
+    const el = e.target, i = +el.dataset.i, k = el.dataset.k; if (isNaN(i)) return;
+    teams[i][k] = k === "name" ? el.value : (parseFloat(el.value) || 0);
+    schedule_run();
+  });
+  $("size").addEventListener("change", () => { resizeTeams(); refreshSpotSelects(); drawInputs(); run(); });
+  $("spots").addEventListener("change", () => { const p = parseInt($("pts").value, 10) || 0; fillSelect($("pts"), 0, parseInt($("spots").value, 10), p); run(); });
+  ["pts", "games", "swing", "sims"].forEach((id) => $(id).addEventListener("input", schedule_run));
+
+  $("load").addEventListener("click", async () => {
+    const id = $("leagueId").value.trim();
+    if (!/^\d{6,}$/.test(id)) { showStatus("error", "Enter your Sleeper league ID (a long number), then press Load."); return; }
+    $("load").disabled = true; showStatus("note", "Loading your league…");
+    try {
+      const fetchJson = async (u) => { const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); };
+      const d = await loadSleeper(fetchJson, id);
+      if (![8, 10, 12, 14].includes(d.teams.length)) { const o = document.createElement("option"); o.textContent = d.teams.length; $("size").appendChild(o); }
+      $("size").value = d.teams.length; teams = d.teams; schedule = d.schedule;
+      $("games").value = d.totalGames; refreshSpotSelects(); $("spots").value = Math.min(d.spots, d.teams.length - 1);
+      fillSelect($("pts"), 0, parseInt($("spots").value, 10), 0);
+      store.set("oddsLeague", id); drawInputs(); run();
+      showStatus("note", `Loaded ${d.name}. Sleeper does not say how many spots go to points scored, so set that above if your league does. ` + (d.scheduleOk ? "" : "The remaining schedule could not be read, so games are paired at random."));
+    } catch (e) {
+      const blocked = e instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(e.message));
+      showStatus("error", blocked ? "This page could not reach Sleeper. Open it from your own site rather than inside Claude, or type the standings in by hand." : String(e.message));
+    } finally { $("load").disabled = false; }
+  });
+
+  teams = defaults.map(([name, w, l, t, pf]) => ({ name, w, l, t, pf }));
+  refreshSpotSelects(); $("spots").value = 7; fillSelect($("pts"), 0, 7, 1);
+  const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
+  drawInputs(); run();
+}
+if (typeof module !== "undefined") module.exports = { simulate, loadSleeper };
+</script>
+</body>
+</html>
