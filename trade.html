@@ -85,6 +85,9 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .roster td.pn{white-space:normal;text-align:left;font-weight:600}
 .roster td.pn small{display:block;font-weight:500;color:var(--muted);font-size:12px}
 .pos{display:inline-block;min-width:34px;text-align:center;font-size:11px;font-weight:700;border-radius:4px;padding:2px 4px;margin-right:6px;color:#fff;vertical-align:1px}
+.pos.PICK{background:#a16207}
+.lgtype{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-bottom:10px}
+.lgtype b{font-family:var(--display);font-size:16px;letter-spacing:.03em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);padding:2px 10px;border-radius:99px}
 .pos.QB{background:#c2410c}.pos.RB{background:#0f766e}.pos.WR{background:#1d4ed8}.pos.TE{background:#7c3aed}.pos.K{background:#6b7280}.pos.DEF{background:#4b5563}
 .inj{font-size:11px;font-weight:700;color:var(--bad-ink);background:var(--bad-bg);border-radius:4px;padding:1px 5px;margin-left:4px}
 .inj.q{color:var(--warn-ink);background:var(--warn-bg)}
@@ -96,7 +99,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27h";
+  var MINE = "2026-11-27i";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -123,10 +126,12 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     <div class="row" style="margin-top:14px">
       <button id="run" class="primary" type="button">Load league</button>
       <button id="demo" type="button">Use sample data</button>
+      <button id="demoDyn" type="button">Sample dynasty league</button>
     </div>
   </section>
   <section id="status" aria-live="polite"></section>
   <div id="app" hidden>
+    <div class="lgtype" id="lgtype"></div>
     <section class="panel tradebar" aria-label="Trade verdict">
       <div class="verdict muted" id="verdict" aria-live="polite">Tap players on both sides to build a trade</div>
       <div class="bar" role="img" id="barImg" aria-label="Trade balance"><div class="track"></div><div class="marker" id="marker"></div></div>
@@ -142,11 +147,12 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
   </div>
   <section class="panel explain">
     <div><b>Player value (0–100).</b> What he's done and what he's projected to do: his weekly rate is 50% points per game so far and 50% Sleeper's projected points per game for the rest of the season, including your fantasy playoffs, all scored with your league's settings. Players with fewer than six games lean more on the projection. A bye week is a small penalty (it counts as 80% of a week), while weeks he's projected out count as zero. Only points above replacement count, where replacement is the 3rd-best free agent at his position. That's how positional importance and ease of replacement come in: a position your lineup needs a lot of, with a thin waiver wire, is worth more. Kickers and defenses count half because they're easy to stream. Values follow a curve so one star is worth more than two average starters, and 100 is the most valuable player in the league.</div>
+    <div><b>Dynasty leagues.</b> When Sleeper says your league is dynasty, values also count the next three seasons (weighted 80%, 60% and 45%), adjusted for age by position: running backs peak about 22–26 and fade fastest, receivers about 23–28, tight ends 24–29, quarterbacks 24–33. A player's age shows under his name. Every team's draft picks for the next three drafts are listed too, with trades already made in Sleeper applied. A pick is valued like the player you'd expect to get with it: an early 1st is about the league's 15th-most-valuable asset, and value falls off quickly through later rounds. Next year's picks are slotted by the original team's current power ranking (weaker team, earlier pick). Picks further out are treated as mid-round and lose 10% per extra year. Picks don't change anyone's lineup and don't take a roster spot.</div>
     <div><b>The bar.</b> Each side's total value counts the best player fully and each extra player for less (85%, 72%, 62%…), since you can only start so many. The difference sets the bar: within 8% is an even trade, 8–20% slightly favors one team, 20–38% favors them, and more than that is a fleecing.</div>
     <div><b>Lineup change</b> is how much each team's best starting lineup gains or loses per week for the rest of the season. A trade can be even on value and still help both teams. If a team takes back more players than it sends, it has to drop its lowest-value players.</div>
   </section>
 </div>
-<script src="sleeper-core.js?v=2026-11-27h"></script>
+<script src="sleeper-core.js?v=2026-11-27i"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -154,7 +160,7 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { ret
 const saved = store.get("oddsLeague"); if (saved) $("leagueId").value = saved;
 function status(kind, text) { $("status").innerHTML = text ? `<div class="banner ${kind}">${esc(text)}</div>` : ""; }
 
-let B = null, V = null;
+let B = null, V = null, R = null;   // R = redraft values (lineups); V = values used for trades (dynasty values in dynasty leagues)
 const S = { a: { rid: null, give: [], pos: "ALL" }, b: { rid: null, give: [], pos: "ALL" } };
 const other = (k) => (k === "a" ? "b" : "a");
 const team = (rid) => B.teams.find((t) => t.rid === rid);
@@ -164,7 +170,7 @@ function sideHtml(k) {
   const opts = B.teams.map((t) => `<option value="${t.rid}"${t.rid === s.rid ? " selected" : ""}>${esc(t.name)}</option>`).join("");
   return `<label class="f" for="team-${k}">${k === "a" ? "Left" : "Right"} team</label><select id="team-${k}" data-k="${k}">${opts}</select>
     <h2 id="sends-${k}"></h2><div class="chips" id="chips-${k}"></div>
-    <div class="filters" id="filt-${k}">${["ALL", ...SleeperCore.POSITIONS].map((p) => `<button type="button" data-pos="${p}" aria-pressed="${p === s.pos}">${p === "ALL" ? "All" : p}</button>`).join("")}</div>
+    <div class="filters" id="filt-${k}">${["ALL", ...SleeperCore.POSITIONS, ...(B.dynasty ? ["PICK"] : [])].map((p) => `<button type="button" data-pos="${p}" aria-pressed="${p === s.pos}">${p === "ALL" ? "All" : p === "PICK" ? "Picks" : p}</button>`).join("")}</div>
     <div class="roster"><table><thead><tr><th></th><th>Player</th><th title="Trade value, 0-100">Value</th><th title="Points per game so far">PPG</th><th title="Sleeper projected points per game, rest of season">Proj</th></tr></thead><tbody id="roster-${k}"></tbody></table></div>`;
 }
 function injBadge(st) {
@@ -179,18 +185,21 @@ function drawSide(k) {
   $("chips-" + k).innerHTML = s.give.length ? s.give.map((pid) => {
     const p = V.players[pid] || { name: pid, value: 0 };
     return `<span class="chip">${esc(p.name)} <small>${p.value.toFixed(1)}</small><button type="button" data-k="${k}" data-rm="${esc(pid)}" aria-label="Remove ${esc(p.name)}">×</button></span>`;
-  }).join("") : `<span class="empty">Nobody yet. Tap players below.</span>`;
-  const list = t.players.map((pid) => V.players[pid] || { pid, name: pid, pos: "?", value: 0, ppg: 0, ros: 0, nfl: "", injury: "" })
+  }).join("") : `<span class="empty">Nobody yet. Tap players${B.dynasty ? " or picks" : ""} below.</span>`;
+  const own = t.players.concat(B.dynasty && V.teamPicks ? V.teamPicks[t.rid] || [] : []);
+  const list = own.map((pid) => V.players[pid] || { pid, name: pid, pos: "?", value: 0, ppg: 0, ros: 0, nfl: "", injury: "" })
     .filter((p) => s.pos === "ALL" || p.pos === s.pos).sort((x, y) => y.value - x.value || y.ros - x.ros);
   $("roster-" + k).innerHTML = list.map((p) => {
     const sel = s.give.includes(p.pid);
-    const tags = [p.nfl, p.posRank ? `${p.pos}${p.posRank}` : "", p.byeWeeks && p.byeWeeks.length ? `bye wk ${p.byeWeeks.join(", ")}` : "",
+    const tags = p.pos === "PICK"
+      ? [p.from ? `from ${p.from}` : "own pick", p.slotKnown ? "slot set" : p.season === +B.season + 1 ? `projected ~${p.round}.${String(Math.round(p.slot)).padStart(2, "0")}` : "mid-round estimate"].join(" · ")
+      : [p.nfl, p.posRank ? `${p.pos}${p.posRank}` : "", p.age ? `age ${Math.floor(p.age)}` : "", p.byeWeeks && p.byeWeeks.length ? `bye wk ${p.byeWeeks.join(", ")}` : "",
       t.taxi.has(p.pid) ? "taxi" : "", t.reserve.has(p.pid) ? "IR slot" : ""].filter(Boolean).join(" · ");
     return `<tr class="p${sel ? " sel" : ""}" data-k="${k}" data-pid="${esc(p.pid)}" tabindex="0" aria-pressed="${sel}">
       <td class="ck"><input type="checkbox"${sel ? " checked" : ""} tabindex="-1" aria-hidden="true"></td>
       <td class="pn"><span class="pos ${esc(p.pos)}">${esc(p.pos)}</span>${esc(p.name)}${injBadge(p.injury)}<small>${esc(tags)}</small></td>
       <td class="v">${p.value.toFixed(1)}</td><td>${p.games ? p.ppg.toFixed(1) : "--"}</td><td>${p.projPg ? p.projPg.toFixed(1) : "--"}</td></tr>`;
-  }).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted)">No players at this position.</td></tr>`;
+  }).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted)">${s.pos === "PICK" ? "No draft picks." : "No players at this position."}</td></tr>`;
 }
 function drawBar() {
   const ta = team(S.a.rid), tb = team(S.b.rid);
@@ -215,6 +224,10 @@ function drawBar() {
 function drawAll() { drawSide("a"); drawSide("b"); drawBar(); }
 function start(sample) {
   $("app").hidden = false;
+  const kind = ["Redraft", "Keeper", "Dynasty"][B.leagueType] || "Redraft";
+  $("lgtype").innerHTML = `<b>${kind}</b>` + (B.dynasty
+    ? `<span>Values include age and the next three seasons. Draft picks for ${V.seasons.join(", ")} (${V.rounds} rounds) can be traded.</span>`
+    : `<span>Values are for the rest of this season.</span>`);
   document.querySelectorAll(".side").forEach((el) => {
     const k = el.dataset.side;
     el.innerHTML = sideHtml(k);
@@ -250,25 +263,27 @@ document.addEventListener("keydown", (e) => {
   if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(row.dataset.k, row.dataset.pid); }
 });
 $("clear").addEventListener("click", () => { S.a.give = []; S.b.give = []; drawAll(); });
-async function go(sample) {
+async function go(sample, dynastySample) {
   const id = $("leagueId").value.trim();
   if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Load league."); return; }
   if (!sample) store.set("oddsLeague", id);
-  $("run").disabled = $("demo").disabled = true;
+  $("run").disabled = $("demo").disabled = $("demoDyn").disabled = true;
   try {
-    const net = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
+    const net = sample ? SleeperCore.makeSampleNet(20261127, { dynasty: !!dynastySample }) : SleeperCore.liveNet;
     B = await SleeperCore.loadLeague(net, sample ? "sample" : id, (t) => status("note", t));
-    V = SleeperCore.computeValues(B);
+    R = SleeperCore.computeValues(B);
+    V = B.dynasty ? SleeperCore.computeDynasty(B, R, SleeperCore.powerRankings(B, R)) : R;
     if (B.teams.length < 2) throw new Error("This league needs at least two teams.");
     S.a = { rid: B.teams[0].rid, give: [], pos: "ALL" }; S.b = { rid: B.teams[1].rid, give: [], pos: "ALL" };
     start(sample);
   } catch (e) {
     const msg = String(e && e.message || e);
     status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);
-  } finally { $("run").disabled = $("demo").disabled = false; }
+  } finally { $("run").disabled = $("demo").disabled = $("demoDyn").disabled = false; }
 }
 $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
+$("demoDyn").addEventListener("click", () => go(true, true));
 $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
 </script>
 </body>

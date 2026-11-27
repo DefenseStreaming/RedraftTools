@@ -86,6 +86,9 @@
     ]);
     const season = String(league.season);
     const st = league.settings || {};
+    // Sleeper league type: 0 redraft, 1 keeper, 2 dynasty
+    const leagueType = num(st.type, 0);
+    const dynasty = leagueType === 2;
     const pws = num(st.playoff_week_start, 15) || 15;
     const regEnd = pws - 1;
     const lastWeek = Math.min(18, pws + Math.max(1, Math.ceil(Math.log2(num(st.playoff_teams, 6) || 6))) - 1);
@@ -95,7 +98,7 @@
       const u = um[r.owner_id] || {};
       const s = r.settings || {};
       return {
-        rid: r.roster_id, name: (u.metadata && u.metadata.team_name) || u.display_name || `Team ${r.roster_id}`,
+        rid: r.roster_id, ownerId: r.owner_id, name: (u.metadata && u.metadata.team_name) || u.display_name || `Team ${r.roster_id}`,
         owner: u.display_name || "", players: (r.players || []).map(String), taxi: new Set((r.taxi || []).map(String)),
         reserve: new Set((r.reserve || []).map(String)),
         wins: num(s.wins), losses: num(s.losses), ties: num(s.ties), pf: num(s.fpts) + num(s.fpts_decimal) / 100,
@@ -136,11 +139,21 @@
     if (missing.length && missing.length === remaining.length) notes.push("Sleeper projections could not be loaded, so values use points scored so far only.");
     else if (missing.length) notes.push(`Projections were missing for week ${missing.join(", ")}.`);
 
+    let tradedPicks = [], drafts = [];
+    if (dynasty) {
+      say("Reading draft picks…");
+      [tradedPicks, drafts] = await Promise.all([
+        net.fetchJson(`${API}/league/${leagueId}/traded_picks`).catch(() => []),
+        net.fetchJson(`${API}/league/${leagueId}/drafts`).catch(() => []),
+      ]);
+    }
+
     say("Getting the player list…");
     let db = {};
     try { db = (await net.fetchJson(`${API}/players/nfl`)) || {}; }
     catch (e) { notes.push("Sleeper's player list could not be loaded, so some injury statuses may be missing."); }
-    return { leagueId, league, season, scoring: league.scoring_settings || {}, slots: startSlots(league.roster_positions),
+    return { leagueId, league, season, leagueType, dynasty, tradedPicks: tradedPicks || [], drafts: drafts || [],
+      scoring: league.scoring_settings || {}, slots: startSlots(league.roster_positions),
       teams, gp, cw, regEnd, lastWeek, remaining, matchups, proj, db, rowInfo, notes };
   }
 
@@ -380,6 +393,101 @@
     return { weeks, series, ranks };
   }
 
+  /* ---------------- dynasty: age-adjusted multi-season values + draft picks ----------------
+     Production relative to a player's peak, by position and age (RBs fall off first, QBs last). */
+  const AGE_CURVE = {
+    QB: { up: { 21: 0.75, 22: 0.85, 23: 0.93 }, peak: [24, 33], down: [0.92, 0.84, 0.75, 0.65, 0.55] },
+    RB: { up: { 21: 0.95 }, peak: [22, 26], down: [0.9, 0.78, 0.65, 0.5, 0.38] },
+    WR: { up: { 21: 0.85, 22: 0.93 }, peak: [23, 28], down: [0.92, 0.83, 0.72, 0.6, 0.48] },
+    TE: { up: { 21: 0.7, 22: 0.8, 23: 0.9 }, peak: [24, 29], down: [0.9, 0.8, 0.68, 0.55, 0.45] },
+  };
+  const FUTURE_SEASONS = [0.8, 0.6, 0.45];   // weight of the next three seasons (later seasons are less certain)
+  const PICK_YEAR_DISCOUNT = 0.9;           // each extra year until a pick is used
+  function ageFactor(pos, age) {
+    const c = AGE_CURVE[pos];
+    if (!c || !age) return 1;
+    const a = Math.round(age);
+    if (a >= c.peak[0] && a <= c.peak[1]) return 1;
+    if (a < c.peak[0]) return c.up[a] || 0.65;
+    const k = a - c.peak[1] - 1;
+    return k < c.down.length ? c.down[k] : c.down[c.down.length - 1] * Math.pow(0.8, k - c.down.length + 1);
+  }
+  function playerAge(info) {
+    if (info && Number.isFinite(+info.age) && +info.age > 15) return +info.age;
+    if (info && info.birth_date) { const d = new Date(info.birth_date); if (!isNaN(d)) return (Date.now() - d) / 31557600000; }
+    return null;
+  }
+  const ordinal = (n) => n + (["th", "st", "nd", "rd"][(n % 100 - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
+
+  // returns a values object shaped like computeValues' (players, repl) with dynasty values, plus picks
+  function computeDynasty(b, vals, powerRows) {
+    const info = (pid) => b.db[pid] || b.rowInfo[pid] || {};
+    const remW = b.remaining.length;
+    const players = {};
+    let maxRaw = 0;
+    for (const p of Object.values(vals.players)) {
+      const age = playerAge(info(p.pid));
+      const now = Math.max(0.3, ageFactor(p.pos, age));
+      let future = 0;
+      FUTURE_SEASONS.forEach((w, k) => { future += w * ageFactor(p.pos, age ? age + k + 1 : null) / now; });
+      const raw = p.vor * remW + (p.seasonVor || 0) * 17 * future;
+      players[p.pid] = { ...p, age, redraftValue: p.value, dynRaw: raw };
+      maxRaw = Math.max(maxRaw, raw);
+    }
+    for (const p of Object.values(players)) p.value = maxRaw > 0 ? 100 * Math.pow(p.dynRaw / maxRaw, STAR_POWER) : 0;
+    for (const pos of POSITIONS) Object.values(players).filter((p) => p.pos === pos).sort((a, c) => c.value - a.value).forEach((p, i) => { p.posRank = i + 1; });
+
+    // ---- draft picks ----
+    const N = b.teams.length, cur = +b.season;
+    const drafts = (b.drafts || []).slice().sort((x, y) => +y.season - +x.season);
+    const pending = drafts.find((d) => String(d.season) === String(cur) && d.status !== "complete");
+    const rounds = num((drafts[0] && drafts[0].settings && drafts[0].settings.rounds) || (b.league.settings || {}).draft_rounds, 4) || 4;
+    const seasons = (pending ? [cur] : []).concat([cur + 1, cur + 2, cur + 3]);
+    // asset value ladder: the league's players by value, best first
+    const ladder = Object.values(players).map((p) => p.value).sort((a, c) => c - a);
+    const valueAtRank = (r) => {                                   // r is 1-based and can be fractional
+      const i = Math.max(0, r - 1), lo = Math.floor(i), hi = Math.min(ladder.length - 1, lo + 1);
+      if (lo >= ladder.length) return 0;
+      return ladder[lo] + (ladder[hi] - ladder[lo]) * (i - lo);
+    };
+    // a pick is worth about the league's Nth most valuable player: early 1st ~ a top-15 asset
+    const pickValue = (round, slot) => valueAtRank(N + 3.2 * ((round - 1) * N + slot));
+    const rankOf = {};
+    (powerRows || []).forEach((r) => { rankOf[r.rid] = r.rank; });
+    const mid = (N + 1) / 2;
+    const orderSlot = {};
+    if (pending && pending.draft_order) {
+      for (const t of b.teams) { const sl = pending.draft_order[t.ownerId]; if (sl) orderSlot[t.rid] = +sl; }
+    }
+    const owner = {};
+    for (const tp of b.tradedPicks || []) owner[`${tp.season}:${tp.round}:${tp.roster_id}`] = tp.owner_id;
+    const teamName = (rid) => (b.teams.find((t) => t.rid === rid) || {}).name || `Team ${rid}`;
+    const teamPicks = {};
+    for (const t of b.teams) teamPicks[t.rid] = [];
+    for (const season of seasons) {
+      const yearsOut = season - cur;
+      for (let round = 1; round <= rounds; round++) {
+        for (const t of b.teams) {
+          const orig = t.rid;
+          const own = owner[`${season}:${round}:${orig}`] != null ? +owner[`${season}:${round}:${orig}`] : orig;
+          if (!(own in teamPicks)) continue;
+          let slot, slotKnown = false;
+          if (yearsOut <= 0 && orderSlot[orig]) { slot = orderSlot[orig]; slotKnown = true; }
+          else if (yearsOut <= 1 && rankOf[orig]) slot = 0.6 * (N + 1 - rankOf[orig]) + 0.4 * mid;   // weaker team, earlier pick
+          else slot = mid;
+          const value = pickValue(round, slot) * Math.pow(PICK_YEAR_DISCOUNT, Math.max(0, yearsOut - 1));
+          const pid = `pick:${season}:${round}:${orig}`;
+          const label = slotKnown ? `${season} ${round}.${String(slot).padStart(2, "0")}` : `${season} ${ordinal(round)}`;
+          players[pid] = { pid, name: label, pos: "PICK", nfl: "", injury: "", owner: own, orig, season, round, slot, slotKnown,
+            from: orig !== own ? teamName(orig) : null, value, ppg: 0, games: 0, ros: 0, projPg: 0, rate: 0, weekly: [], byeWeeks: [] };
+          teamPicks[own].push(pid);
+        }
+      }
+    }
+    for (const rid in teamPicks) teamPicks[rid].sort((x, y) => players[x].season - players[y].season || players[x].round - players[y].round || players[y].value - players[x].value);
+    return { players, repl: vals.repl, haveProj: vals.haveProj, dynasty: true, teamPicks, seasons, rounds };
+  }
+
   /* ---------------- trades ---------------- */
   const DEPTH = [1, 0.85, 0.72, 0.62, 0.55];   // extra pieces count for less: you can only start so many
   const sideValue = (vals) => vals.slice().sort((a, b) => b - a).reduce((s, v, i) => s + v * DEPTH[Math.min(i, DEPTH.length - 1)], 0);
@@ -392,13 +500,14 @@
     const lean = big > 0 ? (aGet - bGet) / big : 0;
     const mag = Math.abs(lean);
     const level = !aGives.length && !bGives.length ? "empty" : mag < 0.08 ? "even" : mag < 0.2 ? "slight" : mag < 0.38 ? "favors" : "fleece";
+    const isPick = (p) => String(p).startsWith("pick:");
     const impact = (rid, gives, gets) => {
       const t = team(rid);
       if (!t) return null;
       const base = t.players.filter((p) => !t.taxi.has(p));
-      const after = base.filter((p) => !gives.includes(p)).concat(gets);
+      const after = base.filter((p) => !gives.includes(p)).concat(gets.filter((p) => !isPick(p)));
       const before = lineupStrength(b, vals, base, 99), now = lineupStrength(b, vals, after, 99);
-      const spots = gets.length - gives.length;
+      const spots = gets.filter((p) => !isPick(p)).length - gives.filter((p) => !isPick(p)).length;
       const drops = spots > 0 ? after.filter((p) => !t.reserve.has(p)).map((p) => P[p] || { pid: p, name: p, value: 0 })
         .sort((x, y) => x.value - y.value).slice(0, spots).map((p) => p.name) : [];
       return { before, after: now, delta: now - before, drops };
@@ -407,7 +516,7 @@
   }
 
   /* ---------------- sample league (same code path, fake network) ---------------- */
-  function makeSampleNet(seed = 20261127) {
+  function makeSampleNet(seed = 20261127, opts = {}) {
     let s = seed;
     const rnd = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
     const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
@@ -428,7 +537,8 @@
         const r = rnd();
         const inj = r < 0.04 ? "Out" : r < 0.1 ? "Questionable" : r < 0.12 ? "IR" : r < 0.13 ? "Doubtful" : null;
         const p = { player_id: pid, first_name: FIRST[Math.floor(rnd() * FIRST.length)], last_name: LAST[Math.floor(rnd() * LAST.length)],
-          position: pos, fantasy_positions: [pos], team: NFL[Math.floor(rnd() * NFL.length)], injury_status: inj, _mu: mu };
+          position: pos, fantasy_positions: [pos], team: NFL[Math.floor(rnd() * NFL.length)], injury_status: inj, _mu: mu,
+          age: Math.round(21 + rnd() * (pos === "QB" ? 15 : pos === "RB" ? 9 : 12)) };
         p.full_name = p.first_name + " " + p.last_name;
         players[pid] = p; plist.push(p);
       }
@@ -490,7 +600,8 @@
     }
     for (const r of rosters) { const x = rec[r.roster_id]; const cents = Math.round(x.fpts * 100); r.settings = { wins: x.wins, losses: x.losses, ties: x.ties, fpts: Math.floor(cents / 100), fpts_decimal: cents % 100 }; }
     const users = NAMES.map((n, i) => ({ user_id: "u" + (i + 1), display_name: "owner" + (i + 1), metadata: { team_name: n } }));
-    const league = { name: "Sample league", season: "2026", roster_positions: slots, settings: { playoff_week_start: 15, playoff_teams: 7 },
+    const league = { name: opts.dynasty ? "Sample dynasty league" : "Sample league", season: "2026", roster_positions: slots,
+      settings: { playoff_week_start: 15, playoff_teams: 7, type: opts.dynasty ? 2 : 0, draft_rounds: 4 },
       scoring_settings: { rec: 1, pass_yd: 0.04, pass_td: 4, rush_yd: 0.1, rush_td: 6, rec_yd: 0.1, rec_td: 6 } };
     const projRows = (w) => plist.map((p) => {
       let v = bye[p.team] === w ? 0 : p._mu * (0.9 + 0.2 * rnd());
@@ -507,6 +618,11 @@
         if (/\/users$/.test(url)) return users;
         if ((m = /\/matchups\/(\d+)$/.exec(url))) return matchups[+m[1]] || [];
         if (/\/players\/nfl$/.test(url)) return db;
+        if (/\/traded_picks$/.test(url)) return [
+          { season: "2027", round: 1, roster_id: 3, previous_owner_id: 3, owner_id: 1 },
+          { season: "2027", round: 2, roster_id: 1, previous_owner_id: 1, owner_id: 5 },
+          { season: "2028", round: 1, roster_id: 12, previous_owner_id: 12, owner_id: 2 } ];
+        if (/\/drafts$/.test(url)) return [{ season: "2026", status: "complete", settings: { rounds: 4 } }];
         if ((m = /\/projections\/nfl\/2026\/(\d+)/.exec(url))) return projRows(+m[1]);
         if (/\/v1\/league\/[^/]+$/.test(url)) return league;
         throw new Error("sample: unknown url " + url);
@@ -515,7 +631,7 @@
   }
 
   const api = { API, POSITIONS, SLOT_ACCEPTS, TIERS, liveNet, makeSampleNet, loadLeague, computeValues, bestLineup,
-    lineupStrength, rosterValue, powerRankings, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
+    lineupStrength, rosterValue, powerRankings, computeDynasty, ageFactor, powerHistory, powerScores, standingsThrough, evaluateTrade, projPoints, tierFor, zscores,
     settings: { BENCH_CREDIT, BENCH_COUNT, DONE_WEIGHT, FULL_GAMES, BYE_CREDIT, WAIVER_RANK, STAR_POWER, STREAM_DISCOUNT, ROSTER_WEEKS, QUESTIONABLE, DOUBTFUL } };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SleeperCore = api;
