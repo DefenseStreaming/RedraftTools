@@ -16,6 +16,9 @@ body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
 .sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
 .sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
 .sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+@media(max-width:700px){.sitenav .in{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-right:28px;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  .sitenav .in::-webkit-scrollbar{display:none}.sitenav a{flex:0 0 auto;padding:12px 10px;font-size:14px}.sitenav a.brand{font-size:20px;margin-right:2px}}
 .sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
 .sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
 .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
@@ -44,6 +47,10 @@ td.tm{font-weight:600}
 td.last{font-family:var(--display);font-size:24px;font-weight:700;color:var(--accent)}
 tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .explain{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}.explain b{color:var(--ink)}
+th button.sort{background:none;border:0;padding:4px 0;min-height:32px;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+th button.sort .arr{opacity:0;font-size:10px}th button.sort:hover .arr{opacity:.45}
+th[aria-sort] button.sort{color:var(--ink)}th[aria-sort] button.sort .arr{opacity:1}
+@media(max-width:700px){th button.sort{gap:1px}th:not([aria-sort]) button.sort .arr{display:none}}
 .controls{display:grid;gap:12px;grid-template-columns:minmax(0,320px)}
 h2{font-family:var(--display);font-size:28px;margin:0 0 2px}
 .lead{color:var(--muted);font-size:14px;margin:0 0 12px;max-width:80ch}
@@ -56,13 +63,13 @@ h2{font-family:var(--display);font-size:28px;margin:0 0 2px}
 .lk.pos{color:#1f8a4c;font-weight:600}.lk.neg{color:#c0392b;font-weight:600}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .mv.up,:root:not([data-theme="light"]) .lk.pos{color:#4fd18b}:root:not([data-theme="light"]) .mv.dn,:root:not([data-theme="light"]) .lk.neg{color:#ff8a7a}}
 :root[data-theme="dark"] .mv.up,:root[data-theme="dark"] .lk.pos{color:#4fd18b}:root[data-theme="dark"] .mv.dn,:root[data-theme="dark"] .lk.neg{color:#ff8a7a}
-@media(max-width:700px){.st td,.st th{padding:8px 5px}.st th{font-size:11px;letter-spacing:.03em}.st .hide-sm{display:none}.st td.tm{min-width:110px;font-size:15px}.st td.big{font-size:19px}}
+@media(max-width:700px){.st td,.st th{padding:8px 4px}.st th{font-size:11px;letter-spacing:.02em}.st .hide-sm{display:none}.st td.tm{min-width:96px;font-size:15px}.st td.big{font-size:18px}.st td:first-child{white-space:nowrap}.mv{margin-left:2px}}
 </style>
 <script>
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27l";
+  var MINE = "2026-11-28b";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -74,6 +81,7 @@ h2{font-family:var(--display);font-size:28px;margin:0 0 2px}
   } catch (e) {}
 })();
 </script>
+<script src="leagues.js?v=2026-11-28b"></script>
 </head>
 <body>
 <nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="analysis.html" aria-current="page">League Analysis</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
@@ -111,9 +119,10 @@ h2{font-family:var(--display);font-size:28px;margin:0 0 2px}
   <section class="panel explain">
     <div><b>Which weeks count.</b> Finished regular-season weeks only. Playoff weeks and the week in progress are left out. Ties with the median (exactly the median score) count as a tie.</div>
     <div><b>Seasons.</b> Past seasons come from Sleeper's link between each season's league and the one before it. If your league was recreated instead of renewed in Sleeper, older seasons won't appear. <b>All time</b> adds up every season by manager, so a manager keeps their history even if their team name or roster slot changed. The name shown is their latest team name.</div>
+    <div><b>Sorting.</b> Tap any column header to sort that table, and tap again to flip the order. Tap # to go back to the standings.</div>
   </section>
 </div>
-<script src="sleeper-core.js?v=2026-11-27l"></script>
+<script src="sleeper-core.js?v=2026-11-28b"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -129,6 +138,21 @@ function teamCell(r, allTime) {
   const sub = [r.owner && r.owner !== r.name ? r.owner : "", allTime ? `${r.seasons} season${r.seasons === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
   return `<td class="tm">${esc(r.name)}${sub ? `<small>${esc(sub)}</small>` : ""}</td>`;
 }
+/* sortable columns: each table remembers its own sort. # goes back to the standings order. */
+const SORTS = {
+  med: { key: "rank", dir: 1, def: { rank: 1, name: 1, comb: -1, h2h: -1, med: -1, pf: -1 },
+    val: { rank: (r) => r.medRank, name: (r) => r.name.toLowerCase(), comb: (r) => r.combPct, h2h: (r) => r.h2hPct, med: (r) => r.medPct, pf: (r) => r.pf } },
+  all: { key: "rank", dir: 1, def: { rank: 1, name: 1, all: -1, h2h: -1, xw: -1, luck: -1 },
+    val: { rank: (r) => r.allRank, name: (r) => r.name.toLowerCase(), all: (r) => r.allPct, h2h: (r) => r.h2hPct, xw: (r) => r.xw, luck: (r) => r.luck } },
+};
+function sorted(list, t) {
+  const S = SORTS[t], f = S.val[S.key];
+  return list.slice().sort((a, b) => { const x = f(a), y = f(b); const c = typeof x === "string" ? x.localeCompare(y) : x - y; return c * S.dir || b.pf - a.pf; });
+}
+function sortTh(t, label, key, cls = "", title = "") {
+  const S = SORTS[t], on = S.key === key;
+  return `<th${cls ? ` class="${cls}"` : ""}${on ? ` aria-sort="${S.dir > 0 ? "ascending" : "descending"}"` : ""}><button type="button" class="sort" data-t="${t}" data-sort="${key}"${title ? ` title="${esc(title)}"` : ""}>${label}<span class="arr" aria-hidden="true">${on ? (S.dir > 0 ? "▲" : "▼") : S.def[key] > 0 ? "▲" : "▼"}</span></button></th>`;
+}
 function draw() {
   const v = $("season").value, allTime = v === "all";
   const sel = allTime ? H.seasons : H.seasons.filter((s) => s.season === v);
@@ -142,16 +166,18 @@ function draw() {
   $("seasonNote").textContent = parts.join(" ");
   const empty = (cols) => `<tr><td colspan="${cols}" style="text-align:center;color:var(--muted);padding:20px">No finished weeks to show.</td></tr>`;
 
-  $("medHead").innerHTML = `<tr><th>#</th><th>Team</th><th title="Record with median games added">Record</th><th class="hide-sm">Win %</th><th class="hide-sm" title="Real head-to-head record">H2H</th><th title="Record against the weekly median">vs Med.</th><th class="hide-sm">Points for</th></tr>`;
-  $("medList").innerHTML = A.weeks ? A.median.map((r) => {
+  $("medHead").innerHTML = `<tr>${sortTh("med", "#", "rank", "", "Sort by standings")}${sortTh("med", "Team", "name")}${sortTh("med", "Record", "comb", "", "Record with median games added")}` +
+    `<th class="hide-sm">Win %</th>${sortTh("med", "H2H", "h2h", "hide-sm", "Real head-to-head record")}${sortTh("med", "vs Med.", "med", "", "Record against the weekly median")}${sortTh("med", "Points for", "pf", "hide-sm")}</tr>`;
+  $("medList").innerHTML = A.weeks ? sorted(A.median, "med").map((r) => {
     const d = r.h2hRank - r.medRank;
     const mv = d > 0 ? `<span class="mv up" title="Up ${d} from H2H standings">▲${d}</span>` : d < 0 ? `<span class="mv dn" title="Down ${-d} from H2H standings">▼${-d}</span>` : "";
     return `<tr><td>${r.medRank}${mv}</td>${teamCell(r, allTime)}<td class="big">${rec(r.cw, r.cl, r.ct)}</td><td class="hide-sm">${pct(r.combPct)}</td>
       <td class="hide-sm mut">${rec(r.w, r.l, r.t)}</td><td>${rec(r.mw, r.ml, r.mt)}</td><td class="hide-sm">${n1(r.pf)}</td></tr>`;
   }).join("") : empty(7);
 
-  $("allHead").innerHTML = `<tr><th>#</th><th>Team</th><th>All-play</th><th>Win %</th><th class="hide-sm" title="Real head-to-head record">H2H</th><th class="hide-sm" title="All-play win rate times games played">Exp. wins</th><th title="Real wins minus expected wins">Luck</th></tr>`;
-  $("allList").innerHTML = A.weeks ? A.allPlay.map((r) => {
+  $("allHead").innerHTML = `<tr>${sortTh("all", "#", "rank", "", "Sort by standings")}${sortTh("all", "Team", "name")}${sortTh("all", "All-play", "all")}<th>Win %</th>` +
+    `${sortTh("all", "H2H", "h2h", "hide-sm", "Real head-to-head record")}${sortTh("all", "Exp. wins", "xw", "hide-sm", "All-play win rate times games played")}${sortTh("all", "Luck", "luck", "", "Real wins minus expected wins")}</tr>`;
+  $("allList").innerHTML = A.weeks ? sorted(A.allPlay, "all").map((r) => {
     const lk = r.luck, cls = lk > 0.25 ? "pos" : lk < -0.25 ? "neg" : "";
     return `<tr><td>${r.allRank}</td>${teamCell(r, allTime)}<td class="big">${rec(r.aw, r.al, r.at)}</td><td>${pct(r.allPct)}</td>
       <td class="hide-sm mut">${rec(r.w, r.l, r.t)}</td><td class="hide-sm">${r.xw.toFixed(1)}</td><td class="lk ${cls}">${lk >= 0 ? "+" : "−"}${Math.abs(lk).toFixed(1)}</td></tr>`;
@@ -176,7 +202,7 @@ async function go(sample) {
   $("run").disabled = $("demo").disabled = true;
   try {
     const net = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
-    H = await SleeperCore.loadLeagueHistory(net, sample ? "sample" : id, (t) => status("note", t));
+    H = await SleeperCore.loadLeagueHistory(net, sample ? "sample" : id, (t, i, n) => SleeperLeagues.progress(t, i, n));
     start(sample);
   } catch (e) {
     const msg = String(e && e.message || e);
@@ -184,10 +210,16 @@ async function go(sample) {
   } finally { $("run").disabled = $("demo").disabled = false; }
 }
 $("season").addEventListener("change", draw);
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("th button.sort"); if (!b || !H) return;
+  const S = SORTS[b.dataset.t], k = b.dataset.sort;
+  if (S.key === k) S.dir = -S.dir; else { S.key = k; S.dir = S.def[k]; }
+  draw();
+  const again = document.querySelector(`button.sort[data-t="${b.dataset.t}"][data-sort="${k}"]`); if (again) again.focus();
+});
 $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
 $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
 </script>
-<script src="leagues.js?v=2026-11-27l"></script>
 </body>
 </html>

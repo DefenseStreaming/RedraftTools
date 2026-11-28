@@ -76,8 +76,9 @@
     return HOSTS.map((h) => `${h}/projections/nfl/${season}/${week}?${q}`);
   };
 
+  // say(text, step, total) reports progress; pages show "Step X of Y"
   async function loadLeague(net, leagueId, say = () => {}) {
-    say("Reading your league…");
+    say("Reading your league…", 1, 4);
     const league = await net.fetchJson(`${API}/league/${leagueId}`);
     if (!league || typeof league !== "object" || !league.roster_positions) throw new Error("That league was not found or is not public. Check the league ID.");
     const [users, rosters, state] = await Promise.all([
@@ -114,7 +115,8 @@
     else if (sameSeason && state.season_type === "post") cw = lastWeek + 1;
     cw = Math.max(1, Math.min(cw, lastWeek + 1));
 
-    say("Reading every week's scores…");
+    const steps = dynasty ? 5 : 4;
+    say("Reading every week's scores…", 2, steps);
     const mWeeks = [];
     for (let w = 1; w <= Math.min(cw, regEnd); w++) mWeeks.push(w);
     const matchups = {};
@@ -122,7 +124,7 @@
       try { matchups[w] = (await net.fetchJson(`${API}/league/${leagueId}/matchups/${w}`)) || []; } catch (e) { matchups[w] = []; }
     }));
 
-    say("Getting Sleeper projections for the rest of the season…");
+    say("Getting Sleeper projections for the rest of the season…", 3, steps);
     const remaining = [];
     for (let w = cw; w <= lastWeek; w++) remaining.push(w);
     const proj = {}, rowInfo = {};
@@ -141,14 +143,14 @@
 
     let tradedPicks = [], drafts = [];
     if (dynasty) {
-      say("Reading draft picks…");
+      say("Reading draft picks…", 4, steps);
       [tradedPicks, drafts] = await Promise.all([
         net.fetchJson(`${API}/league/${leagueId}/traded_picks`).catch(() => []),
         net.fetchJson(`${API}/league/${leagueId}/drafts`).catch(() => []),
       ]);
     }
 
-    say("Getting the player list…");
+    say("Getting the player list…", steps, steps);
     let db = {};
     try { db = (await net.fetchJson(`${API}/players/nfl`)) || {}; }
     catch (e) { notes.push("Sleeper's player list could not be loaded, so some injury statuses may be missing."); }
@@ -594,7 +596,7 @@
      Seasons are linked through Sleeper's previous_league_id. Only finished regular-season weeks count.
      All-time totals follow the manager (Sleeper user), not the roster slot, so they survive renumbering. */
   async function loadLeagueHistory(net, leagueId, say = () => {}) {
-    say("Reading your league…");
+    say("Finding every season of your league…");
     const state = await net.fetchJson(`${API}/state/nfl`).catch(() => ({}));
     const chain = [];
     let id = String(leagueId);
@@ -610,11 +612,13 @@
       chain.push(lg);
       id = lg.previous_league_id ? String(lg.previous_league_id) : null;
     }
-    const seasons = [];
-    for (const lg of chain) {
+    // every season's scores at once (the chain itself has to be walked one season at a time)
+    let done = 0;
+    const total = chain.length + 1;
+    say(`Found ${chain.length} season${chain.length === 1 ? "" : "s"}. Reading scores…`, 2, total);
+    const seasons = await Promise.all(chain.map(async (lg) => {
       const lid = String(lg.league_id || leagueId);
       const season = String(lg.season);
-      say(`Reading the ${season} season…`);
       const st = lg.settings || {};
       const regEnd = (num(st.playoff_week_start, 15) || 15) - 1;
       let lastDone = regEnd;
@@ -640,9 +644,11 @@
         rows = rows.map((r) => ({ rid: r.roster_id, pts: num(r.points), mid: r.matchup_id }));
         return rows.some((r) => r.pts !== 0) ? { w, rows } : null;
       }))).filter(Boolean);
-      seasons.push({ season, leagueId: lid, name: lg.name || "", teams, weeks, regEnd, lastDone,
-        sleeperMedian: !!st.league_average_match, current: lg === chain[0] });
-    }
+      done++;
+      say(`Read ${done} of ${chain.length} season${chain.length === 1 ? "" : "s"}…`, Math.min(total, done + 1), total);
+      return { season, leagueId: lid, name: lg.name || "", teams, weeks, regEnd, lastDone,
+        sleeperMedian: !!st.league_average_match, current: lg === chain[0] };
+    }));
     return { seasons, notes: [] };
   }
 

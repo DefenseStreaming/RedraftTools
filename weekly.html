@@ -16,6 +16,9 @@ body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
 .sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
 .sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
 .sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+@media(max-width:700px){.sitenav .in{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-right:28px;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  .sitenav .in::-webkit-scrollbar{display:none}.sitenav a{flex:0 0 auto;padding:12px 10px;font-size:14px}.sitenav a.brand{font-size:20px;margin-right:2px}}
 .sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
 .sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
 .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
@@ -69,6 +72,10 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
   .rk td.pn{min-width:0;font-size:15px}.rk td.sc{font-size:19px}.rk .pos{display:none}.rk td:first-child{padding-left:0}
   .tabs button{padding:4px 12px;font-size:18px;flex:1 1 0}.panel.rkp{padding:12px 10px}}
 .more{display:flex;justify-content:center;margin-top:12px}
+th button.sort{background:none;border:0;padding:4px 0;min-height:32px;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+th button.sort .arr{opacity:0;font-size:10px}th button.sort:hover .arr{opacity:.45}
+th[aria-sort] button.sort{color:var(--ink)}th[aria-sort] button.sort .arr{opacity:1}
+@media(max-width:700px){th button.sort{gap:1px}th:not([aria-sort]) button.sort .arr{display:none}}
 .mix{display:grid;grid-template-columns:1fr 1fr auto;gap:12px 20px;align-items:end;margin-top:14px}
 @media(max-width:700px){.mix{grid-template-columns:1fr}.mix button{justify-self:start}}
 .sl{display:grid;grid-template-columns:1fr 52px;align-items:center;column-gap:10px}.sl label{grid-column:1/-1}
@@ -79,7 +86,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27l";
+  var MINE = "2026-11-28b";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -91,6 +98,7 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
   } catch (e) {}
 })();
 </script>
+<script src="leagues.js?v=2026-11-28b"></script>
 </head>
 <body>
 <nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html" aria-current="page">Weekly Rankings</a><a href="analysis.html">League Analysis</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
@@ -134,9 +142,10 @@ tr.in td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
     <div><b>Score.</b> A blend of Sleeper's projected points for the week you pick and his average: points per game this season, or over his last 3 games if you choose that. The default is 75% projection and 25% average; use the sliders to change the mix (they always add up to 100%) and Reset to go back. Both use your league's own scoring. Games he didn't play (byes, injuries) don't count against his average. A player with no games yet (a rookie, or someone back from a long injury) uses his projection for the whole score.</div>
     <div><b>Changing weeks.</b> Pick any week of the season. For a past week, form only counts games before that week, so the rankings are what they would have said at the time, and the Result column shows what each player actually scored and where he finished at his position. Future weeks use every game played so far.</div>
     <div><b>Owners</b> are today's rosters. Players Sleeper projects for 0 points (bye or out) are left off the list, except when you show one team, where they're listed at the bottom so you can see who's missing. FLEX ranks running backs, receivers and tight ends together.</div>
+    <div><b>Sorting.</b> Tap any column header to sort by it, and tap again to flip the order. Tap # to go back to the rankings.</div>
   </section>
 </div>
-<script src="sleeper-core.js?v=2026-11-27l"></script>
+<script src="sleeper-core.js?v=2026-11-28b"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -165,18 +174,43 @@ const f1 = (x) => (x === null || x === undefined ? "--" : x.toFixed(1));
 function drawTabs() {
   $("tabs").innerHTML = TABS.map((t) => `<button type="button" role="tab" data-tab="${t}" aria-selected="${t === S.tab}">${t}</button>`).join("");
 }
+/* sortable columns: click a header to sort, click again to flip. # goes back to the ranking. */
+const SORT = { key: "rank", dir: 1 };
+const SORT_DEF = { rank: 1, name: 1, owner: 1, proj: -1, form: -1, score: -1, actual: -1 };
+function sortVal(r, key, flex) {
+  if (key === "rank") return flex ? r.flexRank : r.posRank;
+  if (key === "name") return r.name.toLowerCase();
+  if (key === "owner") return r.ownerName ? r.ownerName.toLowerCase() : null;     // free agents last
+  return r[key];
+}
+function sortList(list, flex) {
+  const k = SORT.key, d = SORT.dir;
+  return list.slice().sort((a, b) => {
+    const x = sortVal(a, k, flex), y = sortVal(b, k, flex);
+    if (x === null || x === undefined) return y === null || y === undefined ? b.score - a.score : 1;
+    if (y === null || y === undefined) return -1;
+    const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+    return c ? c * d : b.score - a.score;
+  });
+}
+function sortTh(label, key, cls = "", title = "") {
+  const on = SORT.key === key;
+  return `<th${cls ? ` class="${cls}"` : ""}${on ? ` aria-sort="${SORT.dir > 0 ? "ascending" : "descending"}"` : ""}><button type="button" class="sort" data-sort="${key}"${title ? ` title="${esc(title)}"` : ""}>${label}<span class="arr" aria-hidden="true">${on ? (SORT.dir > 0 ? "▲" : "▼") : SORT_DEF[key] > 0 ? "▲" : "▼"}</span></button></th>`;
+}
 function drawList() {
   if (!R) return;
   const flex = S.tab === "FLEX";
   const inTab = (r) => (flex ? r.pos !== "QB" : r.pos === S.tab);
   const showTeam = /^\d+$/.test(S.show) ? +S.show : null;
   const keep = (r) => S.show === "all" || (S.show === "fa" ? !r.ownerRid : S.show === "owned" ? !!r.ownerRid : r.ownerRid === showTeam);
-  const on = R.rows.filter((r) => r.playing && inTab(r) && keep(r));
+  const on = sortList(R.rows.filter((r) => r.playing && inTab(r) && keep(r)), flex);
   const off = showTeam !== null ? R.rows.filter((r) => !r.playing && inTab(r) && keep(r)) : [];
   const res = R.result;
   const formHead = R.form === "recent" ? `Last ${R.recentN}` : "Avg";
-  $("head").innerHTML = `<tr><th>#</th><th>Player</th><th class="own">Owner</th><th title="Sleeper projection for the week, your scoring">Proj</th>
-    <th title="${R.form === "recent" ? `Average of his last ${R.recentN} games` : "Points per game this season"}">${formHead}</th><th title="${Math.round(R.projWeight * 100)}% projection + ${100 - Math.round(R.projWeight * 100)}% ${formHead.toLowerCase()}">Score</th>${res ? `<th>${res === "final" ? "Result" : "So far"}</th>` : ""}</tr>`;
+  const pw = Math.round(R.projWeight * 100);
+  $("head").innerHTML = `<tr>${sortTh("#", "rank", "", "Sort by ranking")}${sortTh("Player", "name")}${sortTh("Owner", "owner", "own")}${sortTh("Proj", "proj", "", "Sleeper projection for the week, your scoring")}` +
+    `${sortTh(formHead, "form", "", R.form === "recent" ? `Average of his last ${R.recentN} games` : "Points per game this season")}${sortTh("Score", "score", "", `${pw}% projection + ${100 - pw}% ${formHead.toLowerCase()}`)}` +
+    `${res ? sortTh(res === "final" ? "Result" : "So far", "actual") : ""}</tr>`;
   const shown = on.slice(0, S.limit);
   const row = (r, i) => {
     const rank = r.playing ? (flex ? r.flexRank : r.posRank) : "";
@@ -201,7 +235,7 @@ function drawList() {
 async function compute() {
   const w = S.week;
   if (!(w in PROJ)) {
-    status("note", `Getting Sleeper projections for week ${w}…`);
+    SleeperLeagues.progress(`Getting Sleeper projections for week ${w}…`);
     PROJ[w] = B.proj[w] || (await SleeperCore.loadWeekRows(NET, B.season, w));
   }
   if (!PROJ[w]) {
@@ -235,12 +269,13 @@ async function go(sample) {
   if (!sample && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Load league."); return; }
   if (!sample) store.set("oddsLeague", id);
   $("run").disabled = $("demo").disabled = true;
+  let steps = 5;
   try {
     NET = sample ? SleeperCore.makeSampleNet() : SleeperCore.liveNet;
-    B = await SleeperCore.loadLeague(NET, sample ? "sample" : id, (t) => status("note", t));
+    B = await SleeperCore.loadLeague(NET, sample ? "sample" : id, (t, i, n) => { steps = n + 1; SleeperLeagues.progress(t, i, steps); });
     PROJ = {}; POINTS = {};
     DONE = Math.min(B.cw - 1, B.lastWeek);
-    status("note", "Reading every week's player stats…");
+    SleeperLeagues.progress("Reading every week's player stats…", steps, steps);
     const weeks = Array.from({ length: Math.min(B.cw, B.lastWeek) }, (_, i) => i + 1);
     const rows = await Promise.all(weeks.map((w) => SleeperCore.loadWeekRows(NET, B.season, w, "stats")));
     let missing = 0;
@@ -253,6 +288,13 @@ async function go(sample) {
     status("error", /fetch|network|abort/i.test(msg) ? "Could not reach Sleeper. Check the league ID and your connection, then try again." : msg);
   } finally { $("run").disabled = $("demo").disabled = false; }
 }
+$("head").addEventListener("click", (e) => {
+  const b = e.target.closest("button.sort"); if (!b) return;
+  const k = b.dataset.sort;
+  if (SORT.key === k) SORT.dir = -SORT.dir; else { SORT.key = k; SORT.dir = SORT_DEF[k]; }
+  S.limit = PAGE; drawList();
+  const again = $("head").querySelector(`[data-sort="${k}"]`); if (again) again.focus();
+});
 $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
   S.tab = b.dataset.tab; S.limit = PAGE; store.set("wkTab", S.tab); drawTabs(); drawList();
@@ -284,6 +326,5 @@ $("run").addEventListener("click", () => go(false));
 $("demo").addEventListener("click", () => go(true));
 $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(false); });
 </script>
-<script src="leagues.js?v=2026-11-27l"></script>
 </body>
 </html>

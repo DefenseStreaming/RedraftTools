@@ -17,6 +17,9 @@ body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
 .sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
 .sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
 .sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+@media(max-width:700px){.sitenav .in{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-right:28px;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  .sitenav .in::-webkit-scrollbar{display:none}.sitenav a{flex:0 0 auto;padding:12px 10px;font-size:14px}.sitenav a.brand{font-size:20px;margin-right:2px}}
 .sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
 .sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
 .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
@@ -128,7 +131,7 @@ td.out{white-space:normal;min-width:220px}
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27l";
+  var MINE = "2026-11-28b";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -140,8 +143,9 @@ td.out{white-space:normal;min-width:220px}
   } catch (e) {}
 })();
 </script>
+<script src="leagues.js?v=2026-11-28b"></script>
 </head>
-<body>
+<body data-autoload="off">
 <nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="analysis.html">League Analysis</a><a href="trade.html">Trade Calculator</a><a href="odds.html" aria-current="page">Playoff Odds</a></div></nav>
 <div class="wrap">
   <header>
@@ -254,7 +258,7 @@ function getWorker() {
     worker = new Worker(URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })));
     worker.onmessage = (e) => {
       const m = e.data;
-      if (m.type === "progress") status("note", m.text);
+      if (m.type === "progress") SleeperLeagues.progress(m.text);
       else if (m.type === "done") { finish(JSON.parse(m.json)); }
       else if (m.type === "error") { fail(m.text); }
     };
@@ -362,7 +366,7 @@ function go(demo) {
   const id = $("leagueId").value.trim();
   if (!demo && !/^\d{6,}$/.test(id)) { status("error", "Enter your Sleeper league ID (a long number), then press Run."); return; }
   if (!demo) store.set("oddsLeague", id);
-  wasDemo = demo; setBusy(true); status("note", "Starting…");
+  wasDemo = demo; setBusy(true); SleeperLeagues.progress("Starting…");
   getWorker().postMessage({ pyodide: PYODIDE, engine: ENGINE_URL, leagueId: demo ? "demo" : id, sims: parseInt($("sims").value, 10),
     rule: seedCfg.map((x) => x.m).join(""), byes: seedCfg.map((x, i) => x.bye ? i + 1 : 0).filter(Boolean).join(","), demo });
 }
@@ -376,6 +380,5 @@ $("leagueId").addEventListener("keydown", (e) => { if (e.key === "Enter") go(fal
   <section class="pg-flow" id="pdfInjPage"><div class="pg-head"><div class="pg-title">Key injuries</div><div class="pg-sub"><b id="pdfLeague2"></b><br><span id="pdfWhen2"></span></div></div>
     <table class="injall" id="pdfInjAll"></table><p class="pg-note" id="pdfInjNote"></p></section>
 </div>
-<script src="leagues.js?v=2026-11-27l"></script>
 </body>
 </html>

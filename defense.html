@@ -101,6 +101,9 @@ tr.top td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
 .sitenav a{color:var(--ink);text-decoration:none;padding:12px;font-weight:600;font-size:15px;min-height:44px;display:inline-flex;align-items:center;border-bottom:3px solid transparent}
 .sitenav a.brand{font-family:var(--display);font-size:24px;margin-right:8px;color:var(--accent)}
 .sitenav a[aria-current="page"]{border-bottom-color:var(--accent)}
+@media(max-width:700px){.sitenav .in{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-right:28px;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  .sitenav .in::-webkit-scrollbar{display:none}.sitenav a{flex:0 0 auto;padding:12px 10px;font-size:14px}.sitenav a.brand{font-size:20px;margin-right:2px}}
 .sitenav a.soon{color:var(--muted);font-weight:500;pointer-events:none}
 .sitenav a.soon::after{content:"soon";font-size:11px;margin-left:6px;padding:1px 6px;border-radius:99px;border:1px solid var(--line)}
 </style>
@@ -108,7 +111,7 @@ tr.top td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
 /* Phones keep old copies of pages. Ask the site for its current version (never cached) and, if this
    copy is older, reload once with ?v=<version> so the browser fetches the latest page. */
 (function () {
-  var MINE = "2026-11-27l";
+  var MINE = "2026-11-28b";
   try {
     fetch("version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
       if (!v || !v.version || v.version === MINE) return;
@@ -120,6 +123,7 @@ tr.top td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
   } catch (e) {}
 })();
 </script>
+<script src="leagues.js?v=2026-11-28b"></script>
 </head>
 <body>
 <nav class="sitenav" aria-label="Site"><div class="in"><a class="brand" href="index.html">Sleeper Tools</a><a href="defense.html" aria-current="page">Defense Streamer</a><a href="power.html">Power Rankings</a><a href="weekly.html">Weekly Rankings</a><a href="analysis.html">League Analysis</a><a href="trade.html">Trade Calculator</a><a href="odds.html">Playoff Odds</a></div></nav>
@@ -347,7 +351,7 @@ async function computeAll(net, leagueId, opts, progress) {
   const say = progress || (() => {});
   const { pct, freeOnly, shrinkDef = 4, shrinkOpp = 4, nWeeks = 3 } = opts;
   const notes = [];
-  say("Reading your league…");
+  say("Reading your league…", 1, 4);
   const league = await net.fetchJson(`${API}/league/${leagueId}`);
   if (!league || typeof league !== "object" || !league.scoring_settings) throw new Error("That league was not found or is not public. Check the league ID.");
   const scoring = league.scoring_settings;
@@ -361,12 +365,12 @@ async function computeAll(net, leagueId, opts, progress) {
   for (let w = 1; w < target; w++) past.push(w);
   if (!past.length) throw new Error("No completed weeks yet to learn from (it is Week 1). Try again after the first games.");
 
-  say("Getting the NFL schedule…");
+  say("Getting the NFL schedule…", 2, 4);
   let sched = {};
   try { sched = await fetchSchedule(net, season); }
   catch (e) { notes.push("The NFL schedule feed was unavailable, so opponents come from the stats and projection feeds only."); }
 
-  say(`Scoring ${past.length} weeks of defense games with your settings…`);
+  say(`Scoring ${past.length} weeks of defense games with your settings…`, 3, 4);
   const weekRows = await Promise.all(past.map(async (w) => {
     try { return { w, rows: await firstRows(net, statsUrls(season, w)) }; } catch (e) { return { w, rows: [] }; }
   }));
@@ -380,7 +384,7 @@ async function computeAll(net, leagueId, opts, progress) {
   }
   if (games.length < 100) throw new Error(`Only ${games.length} defense games could be read from Sleeper, which is too few. The stats feed may be unavailable right now.`);
 
-  say("Getting projections and ownership…");
+  say("Getting projections and ownership…", 4, 4);
   const proj = {};
   const projRows = await Promise.all(weeksAhead.map(async (w) => {
     try { return { w, rows: await firstRows(net, projectionUrls(season, w)) }; } catch (e) { return { w, rows: [] }; }
@@ -528,7 +532,7 @@ if (typeof document !== "undefined") {
     const opts = { pct, freeOnly: $("freeOnly").checked };
     try {
       const net = sample ? makeSampleNet() : liveNet;
-      const res = await computeAll(net, sample ? "sample" : id, opts, (m) => { $("status").innerHTML = banner("note", m); });
+      const res = await computeAll(net, sample ? "sample" : id, opts, (m, i, n) => SleeperLeagues.progress(m, i, n));
       last = res; lastSample = sample;
       if (!sample) store.set("defenseStreamerLeague", id);
       render(res, sample);
@@ -549,6 +553,5 @@ if (typeof document !== "undefined") {
 }
 if (typeof module !== "undefined") module.exports = { defPoints, tierValue, parseDefRows, parseSchedule, fitEffects, rankDefenses, weekBoards, weightsFrom, computeAll, projDefPoints, roundHalfEven };
 </script>
-<script src="leagues.js?v=2026-11-27l"></script>
 </body>
 </html>
